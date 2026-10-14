@@ -1,0 +1,23 @@
+# Environment & Virtualenv
+.venv/
+env/
+venv/
+ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Facebook Profile Session & Cookies (ห้าม commit ข้อมูลล็อกอินขึ้น Git)
+fb_profile/
+fb_profile_test/
+*.log
+
+# Cache & Local Config
+notified_cache.json
+.env
+
+# OS specific files
+.DS_Store
+Thumbs.db

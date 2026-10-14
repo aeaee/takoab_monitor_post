@@ -1,0 +1,202 @@
+import os
+import subprocess
+import json
+import threading
+import webbrowser
+import requests
+from datetime import datetime
+from config import (
+    CACHE_FILE, NOTIFICATION_STYLE, NOTIFICATION_DURATION, 
+    POST_URL, IS_WINDOWS, IS_MAC, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_CHAT_IDS
+)
+
+def load_cache() -> set:
+    """โหลดรายการ comment_id ที่เคยแจ้งเตือนไปแล้ว"""
+    if not CACHE_FILE.exists():
+        return set()
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return set(data.get("notified_ids", []))
+    except Exception:
+        return set()
+
+def save_cache(notified_ids: set):
+    """บันทึกรายการ comment_id ลงไฟล์แคช"""
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump({
+                "last_updated": datetime.now().isoformat(),
+                "notified_ids": list(notified_ids)
+            }, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[!] ไม่สามารถบันทึกแคชได้: {e}")
+
+def play_alert_sound():
+    """เล่นเสียงแจ้งเตือน (รองรับทั้ง Windows และ macOS)"""
+    try:
+        if IS_WINDOWS:
+            import winsound
+            winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+        elif IS_MAC:
+            sound_path = "/System/Library/Sounds/Glass.aiff"
+            subprocess.Popen(["afplay", sound_path], stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+def send_system_banner(title: str, subtitle: str, message: str):
+    """ส่งแบนเนอร์แจ้งเตือนตามระบบปฏิบัติการ"""
+    if IS_MAC:
+        clean_title = title.replace('"', '\\"')
+        clean_sub = subtitle.replace('"', '\\"')
+        clean_msg = message.replace('"', '\\"').replace('\n', ' ')
+        script = f'display notification "{clean_msg}" with title "{clean_title}" subtitle "{clean_sub}" sound name "Glass"'
+        try:
+            subprocess.run(["osascript", "-e", script], check=False)
+        except Exception:
+            pass
+    elif IS_WINDOWS:
+        # บน Windows ส่งผ่าน PowerShell Toast Notification
+        ps_script = f'''
+        [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+        $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+        $textNodes = $template.GetElementsByTagName("text")
+        $textNodes.Item(0).AppendChild($template.CreateTextNode("{title}")) | Out-Null
+        $textNodes.Item(1).AppendChild($template.CreateTextNode("{message[:100]}")) | Out-Null
+        $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
+        [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("Facebook Group Monitor").Show($toast)
+        '''
+        try:
+            subprocess.Popen(["powershell", "-NoProfile", "-Command", ps_script], stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+def show_modal_dialog(customer_name: str, message: str, duration: int = 60):
+    """
+    เด้งหน้าต่างแจ้งเตือน Modal ค้างไว้จนกว่าจะกดปุ่ม หรือหมดเวลา
+    (รองรับทั้ง Windows MessageBox และ macOS Dialog)
+    """
+    def _run():
+        if IS_MAC:
+            clean_name = customer_name.replace('"', '\\"')
+            clean_msg = message.replace('"', '\\"').replace('\r', '')[:250]
+            dialog_text = f"👤 ลูกค้า: {clean_name}\\n💬 ข้อความ:\\n{clean_msg}"
+            if duration > 0:
+                dialog_text += f"\\n\\n(หน้าต่างนี้จะปิดอัตโนมัติใน {duration} วินาที หากไม่มีการกดปุ่ม)"
+
+            give_up_part = f" giving up after {duration}" if duration > 0 else ""
+            script = f'''
+            tell application "System Events"
+                activate
+                set res to display dialog "{dialog_text}" with title "🚨 มีออเดอร์ใหม่ยังไม่ได้ตอบ!" buttons {{"เปิดดูโพสต์", "รับทราบ"}} default button "รับทราบ" with icon caution{give_up_part}
+                if button returned of res is "เปิดดูโพสต์" then
+                    open location "{POST_URL}"
+                end if
+            end tell
+            '''
+            try:
+                subprocess.run(["osascript", "-e", script], check=False)
+            except Exception:
+                pass
+
+        elif IS_WINDOWS:
+            try:
+                import ctypes
+                # 0x40 = MB_ICONINFORMATION, 0x1 = MB_OKCANCEL
+                clean_text = f"ลูกค้า: {customer_name}\n\nข้อความ:\n{message[:250]}\n\n(กด OK เพื่อเปิดดูโพสต์, Cancel เพื่อปิด)"
+                res = ctypes.windll.user32.MessageBoxW(0, clean_text, "🚨 มีออเดอร์ใหม่ยังไม่ได้ตอบ!", 0x40 | 0x1)
+                # 1 = IDOK
+                if res == 1 and POST_URL:
+                    webbrowser.open(POST_URL)
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+
+def send_telegram_alert(customer_name: str, message: str, reason: str = ""):
+    """ส่งการแจ้งเตือนเข้า Telegram ทุกแชท/กลุ่มที่ระบุไว้"""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_IDS:
+        return
+
+    import html
+    escaped_msg = html.escape(message)
+    escaped_name = html.escape(customer_name)
+
+    text = (
+        f"🚨 <b>มีออเดอร์ใหม่เข้ามาครับ!</b>\n\n"
+        f"👤 <b>ลูกค้า:</b> {escaped_name}\n"
+        f"💬 <b>รายการที่สั่ง</b>\n"
+        f"{escaped_msg}"
+    )
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
+    def _send():
+        for cid in TELEGRAM_CHAT_IDS:
+            payload = {
+                "chat_id": cid,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True
+            }
+            try:
+                resp = requests.post(url, json=payload, timeout=10)
+                if resp.status_code == 200:
+                    print(f"   📱 ส่งแจ้งเตือนเข้า Telegram ({cid}) เรียบร้อยแล้ว!")
+                else:
+                    print(f"[!] ส่ง Telegram ({cid}) ไม่สำเร็จ ({resp.status_code}): {resp.text}")
+            except Exception as e:
+                print(f"[!] เกิดข้อผิดพลาดในการส่ง Telegram ({cid}): {e}")
+
+    threading.Thread(target=_send, daemon=True).start()
+
+def send_telegram_status(status_text: str):
+    """ส่งข้อความสถานะปกติเข้า Telegram ทุกแชทแบบไร้เสียง (Silent Message ไม่สั่น/ไม่ส่งเสียงรบกวน)"""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_IDS:
+        return
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
+    def _send():
+        for cid in TELEGRAM_CHAT_IDS:
+            payload = {
+                "chat_id": cid,
+                "text": status_text,
+                "parse_mode": "HTML",
+                "disable_notification": True
+            }
+            try:
+                requests.post(url, json=payload, timeout=10)
+            except Exception:
+                pass
+
+    threading.Thread(target=_send, daemon=True).start()
+
+def notify_unreplied_order(customer_name: str, comment_text: str, reason: str = ""):
+    """ส่งการแจ้งเตือนเมื่อพบออเดอร์ที่ยังไม่มีการตอบรับ"""
+    now_str = datetime.now().strftime("%H:%M:%S")
+    title = "🚨 มีออเดอร์ใหม่ยังไม่ได้รับ!"
+    subtitle = f"ลูกค้า: {customer_name} ({now_str})"
+
+    print("\n" + "="*50)
+    print(f"🔔 [{now_str}] แจ้งเตือนออเดอร์ที่ยังไม่ได้รับ:")
+    print(f"   👤 ลูกค้า: {customer_name}")
+    print(f"   💬 ข้อความ: {comment_text}")
+    if reason:
+        print(f"   ℹ️ เหตุผล: {reason}")
+    print("="*50 + "\n")
+
+    # 1. เล่นเสียงเตือน
+    play_alert_sound()
+
+    # 2. ส่งแบนเนอร์มุมจอ
+    if NOTIFICATION_STYLE in ["banner", "both"]:
+        send_system_banner(title, subtitle, comment_text)
+
+    # 3. เด้งหน้าต่างค้างไว้บนหน้าจอ
+    if NOTIFICATION_STYLE in ["dialog", "both"]:
+        show_modal_dialog(customer_name, comment_text, duration=NOTIFICATION_DURATION)
+
+    # 4. ส่งข้อความเข้า Telegram (ถ้ามีการตั้งค่าไว้)
+    send_telegram_alert(customer_name, comment_text, reason)
