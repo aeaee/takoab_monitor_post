@@ -11,7 +11,8 @@ else
     echo "[!] ไม่พบ .venv กำลังสร้างสภาพแวดล้อม..."
     python3 -m venv .venv
     source .venv/bin/activate
-    pip install playwright python-dotenv requests
+    pip install -r requirements.txt
+    playwright install chromium
 fi
 
 python3 main.py "$@"

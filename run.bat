@@ -7,7 +7,7 @@ IF NOT EXIST ".venv" (
     echo [!] ไม่พบ .venv กำลังสร้างสภาพแวดล้อมเสมือน...
     python -m venv .venv
     call .venv\Scripts\activate
-    pip install playwright python-dotenv requests
+    pip install -r requirements.txt
     playwright install chromium
 ) ELSE (
     call .venv\Scripts\activate
