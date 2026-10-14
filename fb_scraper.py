@@ -43,56 +43,49 @@ def manual_login():
         print("[✓] บันทึก Session เรียบร้อยแล้ว! ปิดเบราว์เซอร์...")
         context.close()
 
-def expand_comments_and_replies(page: Page, max_scrolls: int = 5):
+def expand_comments_and_replies(page: Page, max_scrolls: int = 4):
     """
-    กดขยาย 'ความคิดเห็นทั้งหมด' เลื่อนอ่านคอมเมนต์อย่างทั่วถึง
-    และคลิกปุ่ม 'ดูความคิดเห็นเพิ่มเติม' / 'ดูการตอบกลับ' (โดยไม่กดปุ่ม 'ตอบกลับ' โดดๆ)
+    กดขยาย 'ความคิดเห็นทั้งหมด' เลื่อนอ่านคอมเมนต์อย่างปลอดภัยด้วย scrollIntoView
+    และคลิกปุ่ม 'ดูความคิดเห็นเพิ่มเติม' / 'ดูการตอบกลับ' (โดยไม่กด Escape และไม่เลื่อนหลุดโพสต์)
     """
-    # 1. พยายามเลือกตัวกรอง 'ความคิดเห็นทั้งหมด' (All Comments / Newest)
+    # 1. พยายามเลือกตัวกรอง 'ความคิดเห็นทั้งหมด' (ถ้ามีปุ่มตัวกรอง)
     try:
-        has_filter_btn = page.evaluate("""() => {
-            const root = document.querySelector('div[role="dialog"]') || document.querySelector('div[role="main"]') || document.body;
+        page.evaluate("""() => {
+            let root = document.querySelector('div[role="dialog"]') || document.querySelector('div[role="main"]') || document.body;
             const btns = Array.from(root.querySelectorAll('div[role="button"], span[role="button"]'));
             for (const b of btns) {
                 const txt = (b.innerText || '').trim();
                 if (txt === 'เกี่ยวข้องมากที่สุด' || txt === 'Most relevant' || txt.includes('เกี่ยวข้องมากที่สุด') || txt.includes('Most relevant')) {
                     b.click();
-                    return true;
+                    break;
                 }
             }
-            return false;
         }""")
-        if has_filter_btn:
-            time.sleep(1)
-            page.evaluate("""() => {
-                const items = Array.from(document.querySelectorAll('div[role="menuitem"], div[role="button"], span, div'));
-                for (const item of items) {
-                    const txt = (item.innerText || '').trim();
-                    if (txt === 'ความคิดเห็นทั้งหมด' || txt === 'All comments' || txt === 'ใหม่ล่าสุด' || txt === 'Newest') {
-                        item.click();
-                        break;
-                    }
+        time.sleep(1)
+        page.evaluate("""() => {
+            const items = Array.from(document.querySelectorAll('div[role="menuitem"], div[role="button"], span, div'));
+            for (const item of items) {
+                const txt = (item.innerText || '').trim();
+                if (txt === 'ความคิดเห็นทั้งหมด' || txt === 'All comments' || txt === 'ใหม่ล่าสุด' || txt === 'Newest') {
+                    item.click();
+                    break;
                 }
-            }""")
-            time.sleep(1.5)
-            # กด Escape เพื่อปิดเมนูที่อาจค้างบังหน้าจอ
-            try:
-                page.keyboard.press("Escape")
-            except Exception:
-                pass
+            }
+        }""")
+        time.sleep(1.5)
     except Exception:
         pass
 
-    # 2. เลื่อนหน้าจอลงเป็นระยะๆ และกดปุ่ม 'ดูความคิดเห็นเพิ่มเติม' / 'ดูการตอบกลับ'
+    # 2. เลื่อนอ่านคอมเมนต์และคลิกขยายเพิ่มเติม
     for _ in range(max_scrolls):
-        # 2.1 คลิกปุ่มขยายความคิดเห็นและการตอบกลับที่ปรากฏ
+        # 2.1 คลิกปุ่มขยายความคิดเห็นและการตอบกลับ
         try:
             page.evaluate("""() => {
-                const root = document.querySelector('div[role="dialog"]') || document.querySelector('div[role="main"]') || document.body;
+                let root = document.querySelector('div[role="dialog"]') || document.querySelector('div[role="main"]') || document.body;
                 const buttons = Array.from(root.querySelectorAll('div[role="button"], span[role="button"]'));
                 for (const btn of buttons) {
                     const txt = (btn.innerText || '').trim();
-                    // สำคัญ: ต้องไม่กดปุ่ม 'ตอบกลับ' เฉยๆ เพราะเป็นปุ่มพิมพ์คอมเมนต์ตอบ
+                    // คลิกเฉพาะปุ่มที่ขยายข้อความ/คอมเมนต์ ไม่กดปุ่ม 'ตอบกลับ' โดดๆ
                     if (
                         txt.includes('ดูความคิดเห็นเพิ่มเติม') || 
                         txt.includes('ดูความคิดเห็นก่อนหน้า') || 
@@ -108,6 +101,7 @@ def expand_comments_and_replies(page: Page, max_scrolls: int = 5):
                         txt.includes('more replies') ||
                         txt.includes('See more')
                     ) {
+                        btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         btn.click();
                     }
                 }
@@ -115,25 +109,19 @@ def expand_comments_and_replies(page: Page, max_scrolls: int = 5):
         except Exception:
             pass
 
-        # 2.2 เลื่อนหน้าจอลง (Scroll Down) ทั้งบน window และใน modal dialog
+        # 2.2 เลื่อนคอนเทนเนอร์ของโพสต์ไปยังคอมเมนต์ตัวสุดท้ายอย่างแม่นยำ
         try:
             page.evaluate("""() => {
-                window.scrollBy(0, 900);
-                const dialogs = document.querySelectorAll('div[role="dialog"], div[role="main"]');
-                for (const d of dialogs) {
-                    d.scrollTop += 900;
-                    const innerScrolls = d.querySelectorAll('div');
-                    for (const s of innerScrolls) {
-                        if (s.scrollHeight > s.clientHeight && s.clientHeight > 200) {
-                            s.scrollTop += 900;
-                        }
-                    }
+                let root = document.querySelector('div[role="dialog"]') || document.querySelector('div[role="main"]') || document.body;
+                const articles = Array.from(root.querySelectorAll('div[role="article"]'));
+                if (articles.length > 0) {
+                    articles[articles.length - 1].scrollIntoView({ behavior: 'smooth', block: 'end' });
                 }
             }""")
         except Exception:
             pass
 
-        time.sleep(1.2)
+        time.sleep(1.0)
 
 def extract_comments_from_page(page: Page) -> tuple[str, list]:
     """
@@ -149,18 +137,25 @@ def extract_comments_from_page(page: Page) -> tuple[str, list]:
         const results = [];
         
         let postRoot = document.querySelector('div[role="dialog"]');
-        if (!postRoot) {
+        if (!postRoot || postRoot.querySelectorAll('div[role="article"]').length === 0) {
             postRoot = document.querySelector('div[role="main"]') || document.body;
         }
 
         const allArticles = Array.from(postRoot.querySelectorAll('div[role="article"]'));
         
-        const commentArticles = allArticles.filter(art => {
+        const commentArticles = allArticles.filter((art, idx) => {
             const label = (art.getAttribute('aria-label') || '').toLowerCase();
-            return label.includes('ความคิดเห็น') || 
-                   label.includes('ตอบกลับ') || 
-                   label.includes('comment') || 
-                   label.includes('reply');
+            if (
+                label.includes('ความคิดเห็น') || 
+                label.includes('ตอบกลับ') || 
+                label.includes('comment') || 
+                label.includes('reply')
+            ) {
+                return true;
+            }
+            // สำรอง: กรณีไม่มี aria-label ให้ดูว่ามีปุ่ม 'ถูกใจ' / 'ตอบกลับ' และไม่ใช่ตัวเนื้อหาโพสต์หลัก
+            const txt = art.innerText || '';
+            return idx > 0 && txt.includes('ถูกใจ') && (txt.includes('ตอบกลับ') || txt.includes('แชร์'));
         });
 
         commentArticles.forEach((art) => {
