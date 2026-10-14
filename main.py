@@ -75,63 +75,91 @@ def run_monitor(once: bool = False):
 
             round_count = 1
             while True:
-                # 1. ตรวจสอบเวลาเปิด-ปิดร้าน
-                if not is_within_operating_hours():
+                try:
+                    # 1. ตรวจสอบเวลาเปิด-ปิดร้าน
+                    if not is_within_operating_hours():
+                        now_str = datetime.now().strftime("%H:%M:%S")
+                        print(f"🌙 [{now_str}] ขณะนี้อยู่นอกเวลาเปิดร้าน ({OPERATING_HOURS}) พักการตรวจชั่วคราว...")
+                        time.sleep(120)
+                        continue
+
                     now_str = datetime.now().strftime("%H:%M:%S")
-                    print(f"🌙 [{now_str}] ขณะนี้อยู่นอกเวลาเปิดร้าน ({OPERATING_HOURS}) พักการตรวจชั่วคราว...")
-                    time.sleep(120)
-                    continue
+                    print(f"\n🔄 [รอบที่ {round_count} - {now_str}] กำลังตรวจเช็คโพสต์...")
 
-                now_str = datetime.now().strftime("%H:%M:%S")
-                print(f"\n🔄 [รอบที่ {round_count} - {now_str}] กำลังตรวจเช็คโพสต์...")
+                    # 2. ดึงคอมเมนต์
+                    post_author, comments = extract_comments_from_page(page)
+                    print(f"   📊 ตรวจพบ {len(comments)} เธรดคอมเมนต์ (เจ้าของโพสต์: {post_author or 'ตรวจจับอัตโนมัติ'})")
+                    for c in comments:
+                        snippet = c.get('text', '').replace('\n', ' ')[:45]
+                        r_count = len(c.get('replies', []))
+                        print(f"      💬 [{c.get('author', 'ลูกค้า')}] \"{snippet}\" (คำตอบกลับ: {r_count})")
 
-                # 2. ดึงคอมเมนต์
-                post_author, comments = extract_comments_from_page(page)
-                print(f"   📊 ตรวจพบ {len(comments)} เธรดคอมเมนต์ (เจ้าของโพสต์: {post_author or 'ตรวจจับอัตโนมัติ'})")
-                for c in comments:
-                    snippet = c.get('text', '').replace('\n', ' ')[:45]
-                    r_count = len(c.get('replies', []))
-                    print(f"      💬 [{c.get('author', 'ลูกค้า')}] \"{snippet}\" (คำตอบกลับ: {r_count})")
+                    if comments:
+                        # 3. วิเคราะห์หาออเดอร์ที่ยังไม่ได้รับ
+                        unreplied_orders = analyze_comments(comments, post_author=post_author)
+                        
+                        new_alerts = 0
+                        for item in unreplied_orders:
+                            c_id = item.get("id")
+                            if c_id not in notified_cache:
+                                notify_unreplied_order(
+                                    customer_name=item.get("customer_name", "ลูกค้า"),
+                                    comment_text=item.get("text", ""),
+                                    reason=item.get("reason", "")
+                                )
+                                notified_cache.add(c_id)
+                                new_alerts += 1
 
-                if comments:
-                    # 3. วิเคราะห์หาออเดอร์ที่ยังไม่ได้รับ
-                    unreplied_orders = analyze_comments(comments, post_author=post_author)
-                    
-                    new_alerts = 0
-                    for item in unreplied_orders:
-                        c_id = item.get("id")
-                        if c_id not in notified_cache:
-                            notify_unreplied_order(
-                                customer_name=item.get("customer_name", "ลูกค้า"),
-                                comment_text=item.get("text", ""),
-                                reason=item.get("reason", "")
-                            )
-                            notified_cache.add(c_id)
-                            new_alerts += 1
+                        if new_alerts > 0:
+                            save_cache(notified_cache)
+                            print(f"   🚨 แจ้งเตือนออเดอร์ค้างตอบ: {new_alerts} รายการ")
+                        else:
+                            print("   ✅ ตรวจสอบแล้ว: ออเดอร์ทั้งหมดได้รับการตอบรับแล้ว หรือไม่มีออเดอร์ใหม่")
+                            # ส่งข้อความสถานะปกติเข้า Telegram (แบบไร้เสียง ไม่รบกวนมือถือ)
+                            if SEND_IDLE_STATUS:
+                                short_time = datetime.now().strftime("%H:%M")
+                                send_telegram_status(f"✅ ตรวจสอบแล้ว ({short_time}): ไม่มีออเดอร์ใหม่")
 
-                    if new_alerts > 0:
-                        save_cache(notified_cache)
-                        print(f"   🚨 แจ้งเตือนออเดอร์ค้างตอบ: {new_alerts} รายการ")
-                    else:
-                        print("   ✅ ตรวจสอบแล้ว: ออเดอร์ทั้งหมดได้รับการตอบรับแล้ว หรือไม่มีออเดอร์ใหม่")
-                        # ส่งข้อความสถานะปกติเข้า Telegram (แบบไร้เสียง ไม่รบกวนมือถือ)
-                        if SEND_IDLE_STATUS:
-                            short_time = datetime.now().strftime("%H:%M")
-                            send_telegram_status(f"✅ ตรวจสอบแล้ว ({short_time}): ไม่มีออเดอร์ใหม่")
+                    if once:
+                        print("\n[✓] ตรวจสอบรอบเดียวเรียบร้อยแล้ว ปิดการทำงาน")
+                        break
 
-                if once:
-                    print("\n[✓] ตรวจสอบรอบเดียวเรียบร้อยแล้ว ปิดการทำงาน")
-                    break
+                    # สุ่มหน่วงเวลาเล็กน้อยเพื่อความปลอดภัย ป้องกัน Bot Detection
+                    jitter = random.randint(-5, 10)
+                    sleep_time = max(30, CHECK_INTERVAL + jitter)
+                    print(f"   ⏳ รออีก {sleep_time} วินาทีก่อนตรวจเช็ครอบถัดไป... (กด Ctrl+C เพื่อหยุด)")
 
-                # สุ่มหน่วงเวลาเล็กน้อยเพื่อความปลอดภัย ป้องกัน Bot Detection
-                jitter = random.randint(-5, 10)
-                sleep_time = max(30, CHECK_INTERVAL + jitter)
-                print(f"   ⏳ รออีก {sleep_time} วินาทีก่อนตรวจเช็ครอบถัดไป... (กด Ctrl+C เพื่อหยุด)")
-                time.sleep(sleep_time)
+                    # นับถอยหลังเป็นระยะให้ผู้ใช้เห็นความเคลื่อนไหว
+                    remaining = sleep_time
+                    while remaining > 0:
+                        step = min(30, remaining)
+                        time.sleep(step)
+                        remaining -= step
+                        if remaining > 0 and remaining % 30 == 0:
+                            print(f"      ...จะตรวจรอบถัดไปในอีก {remaining} วินาที...")
 
-                # รีเฟรชหน้าโพสต์
-                page.reload(wait_until="domcontentloaded")
-                round_count += 1
+                    # รีเฟรชหน้าโพสต์เพื่อดึงข้อมูลใหม่
+                    try:
+                        page.reload(timeout=45000, wait_until="domcontentloaded")
+                    except Exception as err:
+                        print(f"   [!] รีเฟรชหน้าเว็บไม่สำเร็จ ({err}) กำลังเปิด URL ใหม่...")
+                        try:
+                            page.goto(POST_URL, timeout=45000, wait_until="domcontentloaded")
+                        except Exception:
+                            pass
+
+                    round_count += 1
+
+                except KeyboardInterrupt:
+                    raise
+                except Exception as err:
+                    print(f"\n[!] เกิดข้อผิดพลาดในการตรวจสอบรอบนี้: {err}")
+                    print("   ⏳ รอ 20 วินาทีก่อนลองรอบถัดไป...")
+                    time.sleep(20)
+                    try:
+                        page.goto(POST_URL, timeout=45000, wait_until="domcontentloaded")
+                    except Exception:
+                        pass
 
         except KeyboardInterrupt:
             print("\n[!] ผู้ใช้สั่งหยุดการทำงาน (Ctrl+C)")
