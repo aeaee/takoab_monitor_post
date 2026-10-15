@@ -2,6 +2,7 @@ import time
 import hashlib
 from playwright.sync_api import sync_playwright, Page, BrowserContext
 from config import CHROME_PATH, USER_DATA_DIR, POST_AUTHOR_NAME, SELLER_NAMES, CONFIRM_KEYWORDS
+from analyzer import check_is_seller
 
 def get_browser_context(p, headless: bool = False) -> BrowserContext:
     """เปิด Persistent Context ของ Chrome เพื่อคงสถานะล็อกอิน (รองรับทั้ง Windows และ Mac)"""
@@ -43,49 +44,71 @@ def manual_login():
         print("[✓] บันทึก Session เรียบร้อยแล้ว! ปิดเบราว์เซอร์...")
         context.close()
 
-def expand_comments_and_replies(page: Page, max_scrolls: int = 4):
+def expand_comments_and_replies(page: Page, max_scrolls: int = 6):
     """
-    กดขยาย 'ความคิดเห็นทั้งหมด' เลื่อนอ่านคอมเมนต์อย่างปลอดภัยด้วย scrollIntoView
-    และคลิกปุ่ม 'ดูความคิดเห็นเพิ่มเติม' / 'ดูการตอบกลับ' (โดยไม่กด Escape และไม่เลื่อนหลุดโพสต์)
+    กดขยาย 'ความคิดเห็นทั้งหมด' เลื่อนอ่านคอมเมนต์ในคอนเทนเนอร์ที่ถูกต้อง
+    และคลิกปุ่ม 'ดูความคิดเห็นเพิ่มเติม' / 'ดูการตอบกลับ ... รายการ' อย่างต่อเนื่อง
     """
-    # 1. พยายามเลือกตัวกรอง 'ความคิดเห็นทั้งหมด' (ถ้ามีปุ่มตัวกรอง)
+    # 1. พยายามเลือกตัวกรอง 'ความคิดเห็นทั้งหมด' หรือ 'ใหม่ล่าสุด'
     try:
         page.evaluate("""() => {
-            let root = document.querySelector('div[role="dialog"]') || document.querySelector('div[role="main"]') || document.body;
-            const btns = Array.from(root.querySelectorAll('div[role="button"], span[role="button"]'));
-            for (const b of btns) {
+            const dialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
+            let postDialog = dialogs.find(d => {
+                const label = d.getAttribute('aria-label') || '';
+                if (label.includes('การแจ้งเตือน') || label.includes('Notifications') || label.includes('แชท') || label.includes('Chat')) return false;
+                return d.querySelectorAll('div[role="article"]').length > 0 || d.innerText.includes('ความคิดเห็น');
+            }) || document.querySelector('div[role="main"]') || document.body;
+
+            const buttons = Array.from(postDialog.querySelectorAll('div[role="button"], span[role="button"]'));
+            const filterBtn = buttons.find(b => {
                 const txt = (b.innerText || '').trim();
-                if (txt === 'เกี่ยวข้องมากที่สุด' || txt === 'Most relevant' || txt.includes('เกี่ยวข้องมากที่สุด') || txt.includes('Most relevant')) {
-                    b.click();
-                    break;
-                }
-            }
+                return txt.includes('เกี่ยวข้องมากที่สุด') || txt.includes('Most relevant');
+            });
+            if (filterBtn) filterBtn.click();
         }""")
-        time.sleep(1)
+        time.sleep(1.0)
         page.evaluate("""() => {
-            const items = Array.from(document.querySelectorAll('div[role="menuitem"], div[role="button"], span, div'));
-            for (const item of items) {
-                const txt = (item.innerText || '').trim();
-                if (txt === 'ความคิดเห็นทั้งหมด' || txt === 'All comments' || txt === 'ใหม่ล่าสุด' || txt === 'Newest') {
-                    item.click();
-                    break;
-                }
-            }
+            const menuItems = Array.from(document.querySelectorAll('div[role="menuitem"], div[role="button"], span, div'));
+            const target = menuItems.find(m => {
+                const txt = (m.innerText || '').trim();
+                return txt === 'ความคิดเห็นทั้งหมด' || txt === 'All comments' || txt === 'ใหม่ล่าสุด' || txt === 'Newest';
+            });
+            if (target) target.click();
         }""")
-        time.sleep(1.5)
+        time.sleep(1.2)
     except Exception:
         pass
 
-    # 2. เลื่อนอ่านคอมเมนต์และคลิกขยายเพิ่มเติม
+    # 2. เลื่อนอ่านคอมเมนต์และคลิกขยายการตอบกลับเพิ่มเติม
     for _ in range(max_scrolls):
-        # 2.1 คลิกปุ่มขยายความคิดเห็นและการตอบกลับ
         try:
             page.evaluate("""() => {
-                let root = document.querySelector('div[role="dialog"]') || document.querySelector('div[role="main"]') || document.body;
-                const buttons = Array.from(root.querySelectorAll('div[role="button"], span[role="button"]'));
+                const dialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
+                let postDialog = dialogs.find(d => {
+                    const label = d.getAttribute('aria-label') || '';
+                    if (label.includes('การแจ้งเตือน') || label.includes('Notifications') || label.includes('แชท') || label.includes('Chat')) return false;
+                    return d.querySelectorAll('div[role="article"]').length > 0 || d.innerText.includes('ความคิดเห็น');
+                }) || document.querySelector('div[role="main"]') || document.body;
+
+                // 2.1 ค้นหาคอนเทนเนอร์ที่มี scrollbar ด้านใน
+                const elements = [postDialog, ...Array.from(postDialog.querySelectorAll('*'))];
+                let scroller = null;
+                let maxDiff = 0;
+                for (const el of elements) {
+                    const style = window.getComputedStyle(el);
+                    if (['auto', 'scroll'].includes(style.overflowY) && el.scrollHeight > el.clientHeight + 50) {
+                        const diff = el.scrollHeight - el.clientHeight;
+                        if (diff > maxDiff) {
+                            maxDiff = diff;
+                            scroller = el;
+                        }
+                    }
+                }
+
+                // 2.2 คลิกปุ่มขยายความคิดเห็นและการตอบกลับ
+                const buttons = Array.from(postDialog.querySelectorAll('div[role="button"], span[role="button"]'));
                 for (const btn of buttons) {
                     const txt = (btn.innerText || '').trim();
-                    // คลิกเฉพาะปุ่มที่ขยายข้อความ/คอมเมนต์ ไม่กดปุ่ม 'ตอบกลับ' โดดๆ
                     if (
                         txt.includes('ดูความคิดเห็นเพิ่มเติม') || 
                         txt.includes('ดูความคิดเห็นก่อนหน้า') || 
@@ -101,43 +124,46 @@ def expand_comments_and_replies(page: Page, max_scrolls: int = 4):
                         txt.includes('more replies') ||
                         txt.includes('See more')
                     ) {
-                        btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        btn.click();
+                        if (txt !== 'ตอบกลับ' && txt !== 'Reply' && txt !== 'ถูกใจ' && txt !== 'Like' && txt !== 'แชร์' && txt !== 'Share') {
+                            btn.scrollIntoView({ behavior: 'instant', block: 'center' });
+                            btn.click();
+                        }
                     }
                 }
-            }""")
-        except Exception:
-            pass
 
-        # 2.2 เลื่อนคอนเทนเนอร์ของโพสต์ไปยังคอมเมนต์ตัวสุดท้ายอย่างแม่นยำ
-        try:
-            page.evaluate("""() => {
-                let root = document.querySelector('div[role="dialog"]') || document.querySelector('div[role="main"]') || document.body;
-                const articles = Array.from(root.querySelectorAll('div[role="article"]'));
-                if (articles.length > 0) {
-                    articles[articles.length - 1].scrollIntoView({ behavior: 'smooth', block: 'end' });
+                // 2.3 เลื่อนหน้าจอลงเพื่อโหลดคอมเมนต์ใหม่
+                if (scroller) {
+                    scroller.scrollTop += 850;
+                } else {
+                    window.scrollBy(0, 850);
                 }
             }""")
         except Exception:
             pass
 
-        time.sleep(1.0)
+        time.sleep(1.2)
 
-def extract_comments_from_page(page: Page) -> tuple[str, list]:
+def extract_comments_from_page(page: Page, post_url: str = "") -> tuple[str, list]:
     """
     ดึงคอมเมนต์เฉพาะของโพสต์เป้าหมาย และจัดกลุ่มคำตอบกลับ (Replies) อย่างแม่นยำ
     """
     time.sleep(1.5)
     print("   📜 กำลังเลื่อนอ่านและขยายความคิดเห็นทั้งหมดในโพสต์...")
-    expand_comments_and_replies(page, max_scrolls=5)
+    expand_comments_and_replies(page, max_scrolls=6)
 
     post_author = POST_AUTHOR_NAME
 
     raw_extracted = page.evaluate("""() => {
         const results = [];
         
-        let postRoot = document.querySelector('div[role="dialog"]');
-        if (!postRoot || postRoot.querySelectorAll('div[role="article"]').length === 0) {
+        const dialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
+        let postRoot = dialogs.find(d => {
+            const label = d.getAttribute('aria-label') || '';
+            if (label.includes('การแจ้งเตือน') || label.includes('Notifications') || label.includes('แชท') || label.includes('Chat')) return false;
+            return d.querySelectorAll('div[role="article"]').length > 0 || d.innerText.includes('ความคิดเห็น');
+        });
+        
+        if (!postRoot) {
             postRoot = document.querySelector('div[role="main"]') || document.body;
         }
 
@@ -162,18 +188,28 @@ def extract_comments_from_page(page: Page) -> tuple[str, list]:
             const label = art.getAttribute('aria-label') || '';
             const fullText = art.innerText || '';
 
-            // 1. ดึงชื่อผู้คอมเมนต์
+            // 1. ดึงชื่อผู้คอมเมนต์ และผู้ที่ถูกตอบกลับ (ถ้ามี)
             let author = '';
-            if (label.includes('ความคิดเห็นโดย ')) {
+            let replyTarget = '';
+
+            if (label.includes('ความคิดเห็นจาก ')) {
+                author = label.split('ความคิดเห็นจาก ')[1].split(' เมื่อ')[0].split(' at ')[0].trim();
+            } else if (label.includes('ความคิดเห็นโดย ')) {
                 author = label.split('ความคิดเห็นโดย ')[1].split(' เมื่อ')[0].split(' at ')[0].trim();
+            } else if (label.includes('ข้อความตอบกลับจาก ')) {
+                author = label.split('ข้อความตอบกลับจาก ')[1].split(' ต่อความคิดเห็นของ')[0].split(' เมื่อ')[0].split(' at ')[0].trim();
             } else if (label.includes('การตอบกลับโดย ')) {
-                author = label.split('การตอบกลับโดย ')[1].split(' เมื่อ')[0].split(' at ')[0].trim();
+                author = label.split('การตอบกลับโดย ')[1].split(' ต่อความคิดเห็นของ')[0].split(' เมื่อ')[0].split(' at ')[0].trim();
             } else if (label.includes('ตอบกลับโดย ')) {
-                author = label.split('ตอบกลับโดย ')[1].split(' เมื่อ')[0].split(' at ')[0].trim();
+                author = label.split('ตอบกลับโดย ')[1].split(' ต่อความคิดเห็นของ')[0].split(' เมื่อ')[0].split(' at ')[0].trim();
             } else if (label.includes('Comment by ')) {
                 author = label.split('Comment by ')[1].split(' at ')[0].split(' on ')[0].trim();
             } else if (label.includes('Reply by ')) {
-                author = label.split('Reply by ')[1].split(' at ')[0].split(' on ')[0].trim();
+                author = label.split('Reply by ')[1].split(' to ')[0].split(' at ')[0].split(' on ')[0].trim();
+            }
+
+            if (label.includes('ต่อความคิดเห็นของ ')) {
+                replyTarget = label.split('ต่อความคิดเห็นของ ')[1].split(' เมื่อ')[0].split(' at ')[0].trim();
             }
 
             if (!author) {
@@ -194,31 +230,40 @@ def extract_comments_from_page(page: Page) -> tuple[str, list]:
             });
             let text = textParts.join(' ');
 
-            // ตรวจสอบว่ามีการแนบรูปภาพในคอมเมนต์หรือไม่ (เช่น แคปรูปเมนูมาสั่ง)
+            // ตรวจสอบว่ามีการแนบรูปภาพหรือส่งสติกเกอร์ในคอมเมนต์หรือไม่
             let hasAttachedPhoto = false;
+            let isSticker = false;
             const commentImages = Array.from(art.querySelectorAll('img'));
             for (const img of commentImages) {
                 const w = img.naturalWidth || img.width || 0;
                 const h = img.naturalHeight || img.height || 0;
-                const alt = img.getAttribute('alt') || '';
-                const src = img.getAttribute('src') || '';
+                const alt = (img.getAttribute('alt') || '').toLowerCase();
+                const src = (img.getAttribute('src') || '').toLowerCase();
+
+                if (alt.includes('สติกเกอร์') || alt.includes('sticker') || src.includes('/stickers/') || src.includes('sticker')) {
+                    isSticker = true;
+                    continue;
+                }
                 if ((w > 50 && h > 50) || alt.includes('รูปภาพ') || alt.includes('อาจเป็น') || src.includes('photo')) {
                     hasAttachedPhoto = true;
                     break;
                 }
             }
 
-            if (hasAttachedPhoto) {
+            if (isSticker && !hasAttachedPhoto) {
+                text = (text ? text + ' ' : '') + '[สติกเกอร์]';
+            } else if (hasAttachedPhoto) {
                 text = (text ? text + ' ' : '') + '[📷 มีแนบรูปภาพ]';
             }
 
             // 3. ตรวจสอบว่าเป็นคำตอบกลับหรือไม่
-            const isReply = label.includes('ตอบกลับ') || label.includes('Reply');
+            const isReply = label.includes('ตอบกลับ') || label.includes('Reply') || !!replyTarget;
             const hasAuthorBadge = fullText.includes('ผู้เขียน') || fullText.includes('Author');
 
             if (author || text) {
                 results.push({
                     author: author,
+                    reply_target: replyTarget,
                     text: text,
                     full_text: fullText,
                     has_author_badge: hasAuthorBadge,
@@ -237,6 +282,7 @@ def extract_comments_from_page(page: Page) -> tuple[str, list]:
 
     for item in raw_extracted:
         author = item.get("author", "").strip()
+        reply_target = item.get("reply_target", "").strip()
         text = item.get("text", "").strip()
         is_reply = item.get("is_reply", False)
         has_author_badge = item.get("has_author_badge", False)
@@ -254,15 +300,29 @@ def extract_comments_from_page(page: Page) -> tuple[str, list]:
         # เช่น "Jerakanok Satthaporn รับออเดอร์ค่ะ" ให้ผูกเป็นคำตอบกลับของลูกค้ารายนั้นทันที!
         linked_to_customer = False
         author_lower = author.lower()
-        is_seller = any(s.lower() in author_lower for s in SELLER_NAMES) or has_author_badge or (post_author and author_lower in post_author.lower())
+        is_seller = check_is_seller(author, has_author_badge, post_author)
         has_confirm_kw = any(kw in text.lower() for kw in CONFIRM_KEYWORDS)
 
-        # เฉพาะกรณีที่มีคำยืนยันรับออเดอร์เท่านั้น ถึงจะนำไปผูกเป็นคำตอบรับของลูกค้าคนอื่น
-        if has_confirm_kw and (is_seller or "รับออเดอร์" in text):
+        # กรณีระบุเป้าหมายที่ตอบกลับชัดเจนจาก aria-label (เช่น "ต่อความคิดเห็นของ Niparat Thummakhan")
+        if reply_target:
+            target_lower = reply_target.lower()
+            for parent in reversed(comments):
+                p_author = parent.get("author", "").lower()
+                if p_author and (p_author in target_lower or target_lower in p_author or p_author.split()[0] in target_lower):
+                    parent["replies"].append({
+                        "author": author,
+                        "text": text,
+                        "has_author_badge": has_author_badge
+                    })
+                    parent["full_thread_text"] += " " + text
+                    linked_to_customer = True
+                    break
+
+        # หรือกรณีคนขายพิมพ์ชื่อลูกค้าในข้อความตอบรับ
+        if not linked_to_customer and has_confirm_kw and (is_seller or "รับออเดอร์" in text):
             for parent in reversed(comments):
                 p_author = parent.get("author", "")
-                # ถ้าข้อความของคนขายมีชื่อของลูกค้าคนนี้อยู่
-                if p_author and (p_author in text or p_author.split()[0] in text):
+                if p_author and (p_author.lower() in text.lower() or p_author.split()[0].lower() in text.lower()):
                     parent["replies"].append({
                         "author": author,
                         "text": text,
@@ -285,7 +345,8 @@ def extract_comments_from_page(page: Page) -> tuple[str, list]:
             comments[-1]["full_thread_text"] += " " + text
         else:
             # เป็นคอมเมนต์ระดับหลัก
-            unique_str = f"{author}_{text[:50]}"
+            post_hash = hashlib.md5(post_url.encode("utf-8")).hexdigest()[:6] if post_url else ""
+            unique_str = f"{post_hash}_{author}_{text[:50]}"
             c_id = hashlib.md5(unique_str.encode("utf-8")).hexdigest()[:12]
 
             parent_item = {
@@ -294,7 +355,8 @@ def extract_comments_from_page(page: Page) -> tuple[str, list]:
                 "text": text,
                 "has_author_badge": has_author_badge,
                 "replies": [],
-                "full_thread_text": full_text
+                "full_thread_text": full_text,
+                "post_url": post_url
             }
             comments.append(parent_item)
 

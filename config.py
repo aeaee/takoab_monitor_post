@@ -4,14 +4,19 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / ".env", encoding="utf-8")
 
 # ตรวจสอบระบบปฏิบัติการ (Windows หรือ macOS)
 IS_WINDOWS = platform.system() == "Windows"
 IS_MAC = platform.system() == "Darwin"
 
-# ตั้งค่า URL ของโพสต์
-POST_URL = os.getenv("POST_URL", "").strip()
+# ตั้งค่า URL ของโพสต์ (รองรับหลายโพสต์ โดยคั่นด้วยเครื่องหมายจุลภาค , หรือขึ้นบรรทัดใหม่)
+raw_post_urls = (os.getenv("POST_URLS", "") or os.getenv("POST_URL", "")).strip()
+POST_URLS = [
+    u.strip() for u in raw_post_urls.replace("\n", ",").split(",") 
+    if u.strip() and "facebook.com" in u
+]
+POST_URL = POST_URLS[0] if POST_URLS else ""
 
 # รายชื่อโปรไฟล์คนขาย / คนตอบรับออเดอร์ (รองรับหลายคน โดยคั่นด้วยเครื่องหมายจุลภาค , )
 raw_authors = os.getenv("POST_AUTHOR_NAME", "").strip()
@@ -79,6 +84,22 @@ ANNOUNCEMENT_KEYWORDS = [
     "พร้อมจัดส่ง", "จัดส่งทุก", "สแกนจ่าย", "เปิดรับออเดอร์", "ปิดรับออเดอร์",
     "ปิดรอบ", "หมดแล้ว", "เปิดร้าน", "ขอบคุณลูกค้า", "ส่งรอบ", "หน้าถุง", "โอนเงินเข้าบัญชี"
 ]
+
+# ข้อความทักทาย ขอบคุณ หรือคำเชิญชวนสั่งอาหารของคนขาย (ไม่ใช่การสั่งอาหาร)
+SELLER_GREETINGS_OR_INVITATIONS = [
+    "สั่งได้", "สอบถามได้", "ทักได้", "สั่งมาได้", "แวะมา", "เจอกัน", "พร้อมเสิร์ฟ",
+    "ขอบคุณ", "ยินดี", "สวัสดี", "โอเค", "ครับผม", "ค่ะคุณ", "ตามนั้น", "รับตลอด", "รับทราบ"
+]
+
+# รายการเมนูอาหารของร้าน
+FOOD_ITEMS = [
+    "ทาโกะ", "ทาโกะยากิ", "นักเก็ต", "เฟรนฟราย", "เฟรนช์ฟราย", "ไก่", "ชีส",
+    "ปลาหมึก", "ทูน่า", "แซลมอน", "กุ้ง", "ปูอัด", "ยำสาหร่าย", "ไส้กรอก", "ไข่กุ้ง", "รวมมิตร"
+]
+
+# หน่วยนับ และคำกริยาสั่งอาหาร
+UNIT_KEYWORDS = ["กล่อง", "ชุด", "จาน", "ถุง", "ชิ้น", "ลูก", "ที่"]
+ORDER_VERBS = ["สั่ง", "เอา", "จอง", "cf", "สั่งให้", "แทน"]
 
 # ค้นหาเส้นทาง Google Chrome ตามระบบปฏิบัติการ
 def get_default_chrome_path():

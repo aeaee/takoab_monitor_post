@@ -1,10 +1,19 @@
 import os
+import sys
 import subprocess
 import json
 import threading
 import webbrowser
 import requests
 from datetime import datetime
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 from config import (
     CACHE_FILE, NOTIFICATION_STYLE, NOTIFICATION_DURATION, 
     POST_URL, IS_WINDOWS, IS_MAC, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_CHAT_IDS
@@ -71,11 +80,13 @@ def send_system_banner(title: str, subtitle: str, message: str):
         except Exception:
             pass
 
-def show_modal_dialog(customer_name: str, message: str, duration: int = 60):
+def show_modal_dialog(customer_name: str, message: str, duration: int = 60, post_url: str = ""):
     """
     เด้งหน้าต่างแจ้งเตือน Modal ค้างไว้จนกว่าจะกดปุ่ม หรือหมดเวลา
     (รองรับทั้ง Windows MessageBox และ macOS Dialog)
     """
+    target_url = post_url or POST_URL
+
     def _run():
         if IS_MAC:
             clean_name = customer_name.replace('"', '\\"')
@@ -85,12 +96,13 @@ def show_modal_dialog(customer_name: str, message: str, duration: int = 60):
                 dialog_text += f"\\n\\n(หน้าต่างนี้จะปิดอัตโนมัติใน {duration} วินาที หากไม่มีการกดปุ่ม)"
 
             give_up_part = f" giving up after {duration}" if duration > 0 else ""
+            open_cmd = f'open location "{target_url}"' if target_url else ""
             script = f'''
             tell application "System Events"
                 activate
                 set res to display dialog "{dialog_text}" with title "🚨 มีออเดอร์ใหม่ยังไม่ได้ตอบ!" buttons {{"เปิดดูโพสต์", "รับทราบ"}} default button "รับทราบ" with icon caution{give_up_part}
                 if button returned of res is "เปิดดูโพสต์" then
-                    open location "{POST_URL}"
+                    {open_cmd}
                 end if
             end tell
             '''
@@ -106,15 +118,15 @@ def show_modal_dialog(customer_name: str, message: str, duration: int = 60):
                 clean_text = f"ลูกค้า: {customer_name}\n\nข้อความ:\n{message[:250]}\n\n(กด OK เพื่อเปิดดูโพสต์, Cancel เพื่อปิด)"
                 res = ctypes.windll.user32.MessageBoxW(0, clean_text, "🚨 มีออเดอร์ใหม่ยังไม่ได้ตอบ!", 0x40 | 0x1)
                 # 1 = IDOK
-                if res == 1 and POST_URL:
-                    webbrowser.open(POST_URL)
+                if res == 1 and target_url:
+                    webbrowser.open(target_url)
             except Exception:
                 pass
 
     t = threading.Thread(target=_run, daemon=True)
     t.start()
 
-def send_telegram_alert(customer_name: str, message: str, reason: str = ""):
+def send_telegram_alert(customer_name: str, message: str, reason: str = "", post_url: str = ""):
     """ส่งการแจ้งเตือนเข้า Telegram ทุกแชท/กลุ่มที่ระบุไว้"""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_IDS:
         return
@@ -122,12 +134,14 @@ def send_telegram_alert(customer_name: str, message: str, reason: str = ""):
     import html
     escaped_msg = html.escape(message)
     escaped_name = html.escape(customer_name)
+    post_link_part = f'\n\n👉 <a href="{post_url}">🔗 <b>กดที่นี่เพื่อเปิดดูโพสต์บน Facebook</b></a>' if post_url else ""
 
     text = (
         f"🚨 <b>มีออเดอร์ใหม่เข้ามาครับ!</b>\n\n"
         f"👤 <b>ลูกค้า:</b> {escaped_name}\n"
         f"💬 <b>รายการที่สั่ง</b>\n"
         f"{escaped_msg}"
+        f"{post_link_part}"
     )
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -173,7 +187,7 @@ def send_telegram_status(status_text: str):
 
     threading.Thread(target=_send, daemon=True).start()
 
-def notify_unreplied_order(customer_name: str, comment_text: str, reason: str = ""):
+def notify_unreplied_order(customer_name: str, comment_text: str, reason: str = "", post_url: str = ""):
     """ส่งการแจ้งเตือนเมื่อพบออเดอร์ที่ยังไม่มีการตอบรับ"""
     now_str = datetime.now().strftime("%H:%M:%S")
     title = "🚨 มีออเดอร์ใหม่ยังไม่ได้รับ!"
@@ -185,6 +199,8 @@ def notify_unreplied_order(customer_name: str, comment_text: str, reason: str = 
     print(f"   💬 ข้อความ: {comment_text}")
     if reason:
         print(f"   ℹ️ เหตุผล: {reason}")
+    if post_url:
+        print(f"   🔗 โพสต์: {post_url}")
     print("="*50 + "\n")
 
     # 1. เล่นเสียงเตือน
@@ -196,7 +212,7 @@ def notify_unreplied_order(customer_name: str, comment_text: str, reason: str = 
 
     # 3. เด้งหน้าต่างค้างไว้บนหน้าจอ
     if NOTIFICATION_STYLE in ["dialog", "both"]:
-        show_modal_dialog(customer_name, comment_text, duration=NOTIFICATION_DURATION)
+        show_modal_dialog(customer_name, comment_text, duration=NOTIFICATION_DURATION, post_url=post_url)
 
     # 4. ส่งข้อความเข้า Telegram (ถ้ามีการตั้งค่าไว้)
-    send_telegram_alert(customer_name, comment_text, reason)
+    send_telegram_alert(customer_name, comment_text, reason, post_url=post_url)

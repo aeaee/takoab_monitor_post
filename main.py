@@ -5,8 +5,15 @@ import argparse
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 from config import (
-    POST_URL, CHECK_INTERVAL, GEMINI_API_KEY, USE_AI,
+    POST_URL, POST_URLS, CHECK_INTERVAL, GEMINI_API_KEY, USE_AI,
     OPERATING_HOURS, SEND_IDLE_STATUS, is_within_operating_hours
 )
 from fb_scraper import get_browser_context, manual_login, extract_comments_from_page
@@ -34,16 +41,18 @@ def test_notification():
     print("[✓] ส่งการแจ้งเตือนทดสอบเรียบร้อยแล้ว!")
 
 def run_monitor(once: bool = False):
-    """รันระบบเฝ้าดูคอมเมนต์ในโพสต์"""
-    if not POST_URL or "facebook.com" not in POST_URL:
-        print("\n[!] ยังไม่ได้ระบุ POST_URL หรือ URL ไม่ถูกต้อง")
+    """รันระบบเฝ้าดูคอมเมนต์ในโพสต์ (รองรับหลายโพสต์)"""
+    if not POST_URLS:
+        print("\n[!] ยังไม่ได้ระบุ POST_URL หรือไม่มี URL ที่ถูกต้อง")
         print("👉 กรุณาเปิดไฟล์ .env แล้วใส่ URL ของโพสต์ที่ต้องการเฝ้าดู เช่น:")
         print("   POST_URL=https://www.facebook.com/groups/xxxx/posts/yyyy/\n")
         return
 
     print("\n" + "="*60)
     print("🚀 เริ่มระบบเฝ้าดูคอมเมนต์โพสต์ Facebook")
-    print(f"📌 ลิงก์โพสต์: {POST_URL}")
+    print(f"📌 จำนวนโพสต์ที่เฝ้าดู: {len(POST_URLS)} โพสต์")
+    for idx, p_url in enumerate(POST_URLS, 1):
+        print(f"   [{idx}] {p_url}")
     print(f"⏱️ รอบการตรวจสอบ: ทุกๆ ~{CHECK_INTERVAL} วินาที")
     if OPERATING_HOURS:
         print(f"⏰ เวลาทำการร้าน: {OPERATING_HOURS}")
@@ -63,11 +72,12 @@ def run_monitor(once: bool = False):
         page = context.new_page()
 
         try:
-            print("[*] กำลังเปิดหน้าโพสต์ Facebook...")
-            page.goto(POST_URL, wait_until="domcontentloaded")
+            # ตรวจสอบเบื้องต้นว่าติดหน้า Login หรือไม่ด้วยโพสต์แรก
+            first_url = POST_URLS[0]
+            print("[*] กำลังเปิดหน้า Facebook เพื่อตรวจสอบสถานะการล็อกอิน...")
+            page.goto(first_url, wait_until="domcontentloaded")
             time.sleep(3)
 
-            # ตรวจสอบเบื้องต้นว่าติดหน้า Login หรือไม่
             if "login" in page.url or page.locator("input[name='email']").is_visible():
                 print("\n[!] ระบบพบว่าบัญชีของคุณยังไม่ได้ล็อกอิน Facebook")
                 print("👉 กรุณารันคำสั่ง: python main.py --login เพื่อล็อกอินก่อน 1 ครั้งครับ\n")
@@ -84,41 +94,55 @@ def run_monitor(once: bool = False):
                         continue
 
                     now_str = datetime.now().strftime("%H:%M:%S")
-                    print(f"\n🔄 [รอบที่ {round_count} - {now_str}] กำลังตรวจเช็คโพสต์...")
+                    print(f"\n🔄 [รอบที่ {round_count} - {now_str}] เริ่มตรวจเช็คทั้งหมด {len(POST_URLS)} โพสต์...")
 
-                    # 2. ดึงคอมเมนต์
-                    post_author, comments = extract_comments_from_page(page)
-                    print(f"   📊 ตรวจพบ {len(comments)} เธรดคอมเมนต์ (เจ้าของโพสต์: {post_author or 'ตรวจจับอัตโนมัติ'})")
-                    for c in comments:
-                        snippet = c.get('text', '').replace('\n', ' ')[:45]
-                        r_count = len(c.get('replies', []))
-                        print(f"      💬 [{c.get('author', 'ลูกค้า')}] \"{snippet}\" (คำตอบกลับ: {r_count})")
+                    total_new_alerts = 0
 
-                    if comments:
-                        # 3. วิเคราะห์หาออเดอร์ที่ยังไม่ได้รับ
-                        unreplied_orders = analyze_comments(comments, post_author=post_author)
-                        
-                        new_alerts = 0
-                        for item in unreplied_orders:
-                            c_id = item.get("id")
-                            if c_id not in notified_cache:
-                                notify_unreplied_order(
-                                    customer_name=item.get("customer_name", "ลูกค้า"),
-                                    comment_text=item.get("text", ""),
-                                    reason=item.get("reason", "")
-                                )
-                                notified_cache.add(c_id)
-                                new_alerts += 1
+                    for p_idx, post_url in enumerate(POST_URLS, 1):
+                        prefix = f"[โพสต์ที่ {p_idx}/{len(POST_URLS)}]" if len(POST_URLS) > 1 else ""
+                        print(f"\n   📄 {prefix} กำลังตรวจโพสต์: {post_url}")
 
-                        if new_alerts > 0:
-                            save_cache(notified_cache)
-                            print(f"   🚨 แจ้งเตือนออเดอร์ค้างตอบ: {new_alerts} รายการ")
-                        else:
-                            print("   ✅ ตรวจสอบแล้ว: ออเดอร์ทั้งหมดได้รับการตอบรับแล้ว หรือไม่มีออเดอร์ใหม่")
-                            # ส่งข้อความสถานะปกติเข้า Telegram (แบบไร้เสียง ไม่รบกวนมือถือ)
-                            if SEND_IDLE_STATUS:
-                                short_time = datetime.now().strftime("%H:%M")
-                                send_telegram_status(f"✅ ตรวจสอบแล้ว ({short_time}): ไม่มีออเดอร์ใหม่")
+                        try:
+                            page.goto(post_url, timeout=45000, wait_until="domcontentloaded")
+                        except Exception as err:
+                            print(f"      [!] เปิดหน้าโพสต์ไม่สำเร็จ ({err}) ข้ามไปยังโพสต์ถัดไป...")
+                            continue
+
+                        # 2. ดึงคอมเมนต์
+                        post_author, comments = extract_comments_from_page(page, post_url=post_url)
+                        print(f"      📊 ตรวจพบ {len(comments)} เธรดคอมเมนต์ (เจ้าของโพสต์: {post_author or 'ตรวจจับอัตโนมัติ'})")
+                        for c in comments:
+                            snippet = c.get('text', '').replace('\n', ' ')[:45]
+                            r_count = len(c.get('replies', []))
+                            print(f"         💬 [{c.get('author', 'ลูกค้า')}] \"{snippet}\" (คำตอบกลับ: {r_count})")
+
+                        if comments:
+                            # 3. วิเคราะห์หาออเดอร์ที่ยังไม่ได้รับ
+                            unreplied_orders = analyze_comments(comments, post_author=post_author)
+                            for item in unreplied_orders:
+                                c_id = item.get("id")
+                                if c_id not in notified_cache:
+                                    notify_unreplied_order(
+                                        customer_name=item.get("customer_name", "ลูกค้า"),
+                                        comment_text=item.get("text", ""),
+                                        reason=item.get("reason", ""),
+                                        post_url=post_url
+                                    )
+                                    notified_cache.add(c_id)
+                                    total_new_alerts += 1
+
+                        if p_idx < len(POST_URLS):
+                            time.sleep(2)
+
+                    if total_new_alerts > 0:
+                        save_cache(notified_cache)
+                        print(f"\n   🚨 แจ้งเตือนออเดอร์ค้างตอบใหม่ในรอบนี้: {total_new_alerts} รายการ")
+                    else:
+                        print(f"\n   ✅ ตรวจสอบครบทุกโพสต์แล้ว: ออเดอร์ทั้งหมดได้รับการตอบรับแล้ว หรือไม่มีออเดอร์ใหม่")
+                        if SEND_IDLE_STATUS:
+                            short_time = datetime.now().strftime("%H:%M")
+                            post_count_str = f" ({len(POST_URLS)} โพสต์)" if len(POST_URLS) > 1 else ""
+                            send_telegram_status(f"✅ ตรวจสอบแล้ว ({short_time}): ไม่มีออเดอร์ใหม่{post_count_str}")
 
                     if once:
                         print("\n[✓] ตรวจสอบรอบเดียวเรียบร้อยแล้ว ปิดการทำงาน")
@@ -127,7 +151,7 @@ def run_monitor(once: bool = False):
                     # สุ่มหน่วงเวลาเล็กน้อยเพื่อความปลอดภัย ป้องกัน Bot Detection
                     jitter = random.randint(-5, 10)
                     sleep_time = max(30, CHECK_INTERVAL + jitter)
-                    print(f"   ⏳ รออีก {sleep_time} วินาทีก่อนตรวจเช็ครอบถัดไป... (กด Ctrl+C เพื่อหยุด)")
+                    print(f"\n   ⏳ รออีก {sleep_time} วินาทีก่อนตรวจเช็ครอบถัดไป... (กด Ctrl+C เพื่อหยุด)")
 
                     # นับถอยหลังเป็นระยะให้ผู้ใช้เห็นความเคลื่อนไหว
                     remaining = sleep_time
@@ -138,16 +162,6 @@ def run_monitor(once: bool = False):
                         if remaining > 0 and remaining % 30 == 0:
                             print(f"      ...จะตรวจรอบถัดไปในอีก {remaining} วินาที...")
 
-                    # รีเฟรชหน้าโพสต์เพื่อดึงข้อมูลใหม่
-                    try:
-                        page.reload(timeout=45000, wait_until="domcontentloaded")
-                    except Exception as err:
-                        print(f"   [!] รีเฟรชหน้าเว็บไม่สำเร็จ ({err}) กำลังเปิด URL ใหม่...")
-                        try:
-                            page.goto(POST_URL, timeout=45000, wait_until="domcontentloaded")
-                        except Exception:
-                            pass
-
                     round_count += 1
 
                 except KeyboardInterrupt:
@@ -156,15 +170,14 @@ def run_monitor(once: bool = False):
                     print(f"\n[!] เกิดข้อผิดพลาดในการตรวจสอบรอบนี้: {err}")
                     print("   ⏳ รอ 20 วินาทีก่อนลองรอบถัดไป...")
                     time.sleep(20)
-                    try:
-                        page.goto(POST_URL, timeout=45000, wait_until="domcontentloaded")
-                    except Exception:
-                        pass
 
         except KeyboardInterrupt:
             print("\n[!] ผู้ใช้สั่งหยุดการทำงาน (Ctrl+C)")
         finally:
-            context.close()
+            try:
+                context.close()
+            except Exception:
+                pass
             print("[*] ปิดเบราว์เซอร์เรียบร้อยแล้ว")
 
 def clear_cache():

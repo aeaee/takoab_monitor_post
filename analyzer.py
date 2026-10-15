@@ -1,38 +1,130 @@
 import json
+import re
 import requests
-from config import GEMINI_API_KEY, GEMINI_MODEL, CONFIRM_KEYWORDS, ORDER_KEYWORDS, ANNOUNCEMENT_KEYWORDS, USE_AI, SELLER_NAMES
+from config import (
+    GEMINI_API_KEY, GEMINI_MODEL, CONFIRM_KEYWORDS, ORDER_KEYWORDS, 
+    ANNOUNCEMENT_KEYWORDS, USE_AI, SELLER_NAMES,
+    SELLER_GREETINGS_OR_INVITATIONS, FOOD_ITEMS, UNIT_KEYWORDS, ORDER_VERBS
+)
 
-def check_is_post_author(author: str, has_author_badge: bool = False, post_author: str = "") -> bool:
-    """
-    ตรวจสอบว่าผู้เขียนคอมเมนต์เป็น 'คนโพสต์' (เจ้าของโพสต์ / ผู้เขียน) หรือไม่
-    คนโพสต์คือผู้สร้างโพสต์ขายของ จะไม่มีทางคอมเมนต์สั่งอาหารจากโพสต์ตนเองเด็ดขาด
-    """
+def normalize_text(text: str) -> str:
+    """ลบเครื่องหมายคำพูด วงเล็บ และตัดช่องว่างส่วนเกิน"""
+    if not text:
+        return ""
+    cleaned = re.sub(r"[\'\"`()\[\]]+", " ", text)
+    return " ".join(cleaned.lower().split())
+
+def get_name_variants(name: str) -> set[str]:
+    """สร้างรูปแบบชื่อที่เป็นไปได้ทั้งหมด เช่น มี/ไม่มีชื่อเล่นในเครื่องหมายคำพูด หรือชื่อคู่ 'กับ'"""
+    variants = set()
+    raw_lower = name.strip().lower()
+    if not raw_lower:
+        return variants
+
+    variants.add(raw_lower)
+    norm = normalize_text(name)
+    if norm:
+        variants.add(norm)
+
+    # 1. กรณีชื่อมีเครื่องหมายคำพูดหรือวงเล็บ เช่น Peerawat 'A' Sukkawat -> Peerawat Sukkawat
+    no_nick = re.sub(r"[\'\"`][^\'\"`]+[\'\"`]", "", name)
+    no_nick = re.sub(r"\([^\)]+\)|\[[^\]]+\]", "", no_nick)
+    no_nick_norm = normalize_text(no_nick)
+    if no_nick_norm and len(no_nick_norm) >= 3:
+        variants.add(no_nick_norm)
+
+    # 2. กรณีชื่อเชื่อมด้วย 'กับ', 'และ', 'and', '&', '/', ',' เช่น 'แม่บี กับ น้องบราวนี่'
+    sub_parts = re.split(r"\s+(?:กับ|และ|and|&)\s+|\s*[/,]\s*", name, flags=re.IGNORECASE)
+    for part in sub_parts:
+        p_clean = normalize_text(part)
+        if p_clean and len(p_clean) >= 2:
+            variants.add(p_clean)
+
+    return variants
+
+def check_is_seller(author: str, has_author_badge: bool = False, post_author: str = "") -> bool:
+    """ตรวจสอบว่าผู้เขียนคอมเมนต์เป็นคนขาย/เจ้าของร้านตามรายชื่อ POST_AUTHOR_NAME หรือไม่"""
     if has_author_badge:
         return True
     if not author:
         return False
-    author_clean = author.lower().strip()
 
+    author_norm = normalize_text(author)
+    if not author_norm:
+        return False
+
+    # ตรวจสอบกับ post_author ที่ส่งเข้ามา
     if post_author:
-        main_author = post_author.split(",")[0].strip().lower()
-        if main_author and (main_author in author_clean or author_clean in main_author):
-            return True
+        for p_name in post_author.split(","):
+            for v in get_name_variants(p_name):
+                if v in author_norm or author_norm in v:
+                    return True
 
+    # ตรวจสอบกับ SELLER_NAMES ทั้งหมดจาก POST_AUTHOR_NAME ใน .env
     if SELLER_NAMES:
-        first_seller = SELLER_NAMES[0].lower()
-        if first_seller in author_clean or author_clean in first_seller:
-            return True
+        for s in SELLER_NAMES:
+            for v in get_name_variants(s):
+                if v in author_norm or author_norm in v:
+                    return True
+
+            s_tokens = [t for t in normalize_text(s).split() if len(t) > 1]
+            a_tokens = [t for t in author_norm.split() if len(t) > 1]
+            if s_tokens and a_tokens:
+                if all(t in s_tokens for t in a_tokens) and len(a_tokens) >= 2:
+                    return True
+                main_s_tokens = [t for t in s_tokens if len(t) >= 4]
+                if main_s_tokens and all(t in a_tokens for t in main_s_tokens):
+                    return True
 
     return False
 
-def check_is_seller(author: str, has_author_badge: bool = False, post_author: str = "") -> bool:
-    """ตรวจสอบว่าผู้เขียนคอมเมนต์เป็นคนขาย/เจ้าของร้านคนใดคนหนึ่งหรือไม่"""
-    if has_author_badge:
+def check_is_post_author(author: str, has_author_badge: bool = False, post_author: str = "") -> bool:
+    """ตรวจสอบว่าผู้เขียนคอมเมนต์เป็นเจ้าของโพสต์หรือทีมงานคนขายหรือไม่"""
+    return check_is_seller(author, has_author_badge, post_author)
+
+def is_seller_ordering_for_customer(text: str) -> bool:
+    """
+    ตรวจสอบว่าข้อความของคนขาย/ทีมงานตาม POST_AUTHOR_NAME เป็นการสั่งอาหารแทนลูกค้าท่านอื่นจริงหรือไม่
+    - หากเป็นสติกเกอร์, ข้อความรับออเดอร์, แจ้งข้อมูลร้าน, คำขอบคุณ, ทักทาย หรือชวนสั่ง จะคืนค่า False
+    - จะคืนค่า True เฉพาะเมื่อมีรายการอาหารหรือคำสั่งซื้อชัดเจนเท่านั้น
+    """
+    if not text:
+        return False
+
+    # ตัดสัญลักษณ์สติกเกอร์และรูปภาพออก
+    text_clean = text.replace("[📷 มีแนบรูปภาพ]", "").replace("[สติกเกอร์]", "").strip().lower()
+
+    # ถ้าตัดสติกเกอร์ออกแล้วไม่มีข้อความ หรือข้อความสั้นมาก (เช่น ส่งสติกเกอร์อย่างเดียว) -> ไม่ใช่การสั่งอาหาร
+    if not text_clean or len(text_clean) < 2:
+        return False
+
+    # 1. ถ้ามีคำยืนยันรับออเดอร์ (เช่น รับออเดอร์ครับ/ค่ะ, รับยอด, จดแล้ว) -> เป็นการตอบรับลูกค้า ไม่ใช่การสั่งของ
+    if any(kw in text_clean for kw in CONFIRM_KEYWORDS):
+        return False
+
+    # 2. ถ้าเป็นข้อความประกาศร้าน (เช่น เปิดร้าน, ปิดรอบ, โอนเงิน) -> ไม่ใช่การสั่งของ
+    if any(kw in text_clean for kw in ANNOUNCEMENT_KEYWORDS):
+        return False
+
+    # 3. ถ้าเป็นคำทักทาย ขอบคุณ หรือคำเชิญชวนสั่งอาหารของคนขาย -> ไม่ใช่การสั่งของ
+    if any(kw in text_clean for kw in SELLER_GREETINGS_OR_INVITATIONS):
+        return False
+
+    # 4. ตรวจสอบว่ามีชื่ออาหาร หรือคำกริยาสั่งซื้อพร้อมจำนวน
+    has_food = any(food in text_clean for food in FOOD_ITEMS)
+    has_unit = any(u in text_clean for u in UNIT_KEYWORDS)
+    has_verb = any(v in text_clean for v in ORDER_VERBS)
+    has_number = bool(re.search(r"\d+|[๑-๙]", text_clean))
+
+    if has_food:
+        if has_unit or has_number or has_verb:
+            return True
         return True
-    author_lower = author.lower().strip()
-    if post_author and author_lower in post_author.lower():
+
+    if has_verb and (has_unit or has_number):
         return True
-    return any(s.lower() in author_lower for s in SELLER_NAMES)
+
+    return False
 
 def analyze_comments(comments: list, post_author: str = "") -> list:
     """
@@ -63,30 +155,25 @@ def analyze_with_gemini(comments: list, post_author: str = "") -> list:
         author = c.get("author", "")
         text = c.get("text", "")
         has_badge = c.get("has_author_badge", False)
-        is_creator = check_is_post_author(author, has_badge, post_author)
         is_seller = check_is_seller(author, has_badge, post_author)
         text_lower = text.lower()
         has_confirm_kw = any(kw in text_lower for kw in CONFIRM_KEYWORDS)
 
-        # 1. ถ้าเป็น "คนโพสต์" (เจ้าของโพสต์ / ผู้เขียน)
-        # ให้ข้ามเสมอ ไม่นำมาตรวจเป็นออเดอร์เด็ดขาด (เก็บเฉพาะข้อความยืนยันรับออเดอร์)
-        if is_creator:
+        # 1. ถ้าเป็นคนขาย (ตามรายชื่อ POST_AUTHOR_NAME หรือมี Author Badge)
+        if is_seller:
+            # เก็บข้อความยืนยันรับออเดอร์ของคนขายไว้ให้ AI ใช้ตรวจสอบการตอบรับ
             if has_confirm_kw:
                 seller_comments.append(f"{author}: {text}")
-            continue
 
-        # 2. ถ้าเป็นข้อความประกาศร้าน ให้ข้าม
-        if any(kw in text_lower for kw in ANNOUNCEMENT_KEYWORDS):
-            continue
+            # เช็คว่าเป็นการสั่งอาหารแทนลูกค้าท่านอื่นจริงหรือไม่
+            # ถ้าเป็นสติกเกอร์ ข้อความรับออเดอร์ ประกาศร้าน หรือขอบคุณ ให้ข้ามทันที ไม่ต้องนำมาตรวจออเดอร์
+            if not is_seller_ordering_for_customer(text):
+                continue
 
-        # 3. ถ้าเป็นคนขายคนอื่น (เช่น แม่บี) และพิมพ์ยืนยันรับออเดอร์ ให้เก็บไว้เป็นข้อความยืนยัน
-        if is_seller and has_confirm_kw:
-            seller_comments.append(f"{author}: {text}")
-        else:
-            # ถ้าเป็นลูกค้าทั่วไป หรือเป็นคนขายที่มาคอมเมนต์สั่งของแทนลูกค้า (ไม่ได้พิมพ์รับออเดอร์)
+            # ถ้าเป็นการสั่งอาหารแทนลูกค้าท่านอื่นจริง ให้ส่งให้ AI ตรวจสอบว่ามีคนตอบรับแล้วหรือยัง
             simplified_comments.append({
                 "id": c.get("id"),
-                "customer_name": f"{author} (สั่งให้ลูกค้า)" if is_seller else author,
+                "customer_name": f"{author} (สั่งให้ลูกค้า)",
                 "comment_text": text,
                 "replies": [
                     {
@@ -98,6 +185,27 @@ def analyze_with_gemini(comments: list, post_author: str = "") -> list:
                 ],
                 "full_thread_text": c.get("full_thread_text", "")[:300]
             })
+            continue
+
+        # 2. ถ้าเป็นข้อความประกาศร้าน ให้ข้าม
+        if any(kw in text_lower for kw in ANNOUNCEMENT_KEYWORDS):
+            continue
+
+        # 3. ถ้าเป็นลูกค้าทั่วไป
+        simplified_comments.append({
+            "id": c.get("id"),
+            "customer_name": author,
+            "comment_text": text,
+            "replies": [
+                {
+                    "author": r.get("author"),
+                    "text": r.get("text"),
+                    "is_author": check_is_seller(r.get("author", ""), r.get("has_author_badge", False), post_author)
+                }
+                for r in c.get("replies", [])
+            ],
+            "full_thread_text": c.get("full_thread_text", "")[:300]
+        })
 
     if not simplified_comments:
         return []
@@ -118,7 +226,7 @@ def analyze_with_gemini(comments: list, post_author: str = "") -> list:
    **หากพบว่าคนขายคนใดคนหนึ่งได้ตอบรับออเดอร์ลูกค้ารายนั้นแล้วไม่ว่าจะวิธีใด ให้ถือว่าตอบรับแล้ว และห้ามแจ้งเตือนเด็ดขาด!**
 2. ตรวจสอบเฉพาะคอมเมนต์ที่มีการ "สั่งซื้อสินค้า" หรือ "สอบถามออเดอร์" (เช่น 'ทาโกะ 1', 'เอา 2 กล่อง', 'cf', 'ราคาเท่าไหร่', หรือมีแนบรูปภาพ)
 3. แจ้งเตือนเฉพาะคอมเมนต์ที่ **"ยังไม่ได้รับการตอบรับออเดอร์จากคนขาย"** เท่านั้น!
-4. กรณีทีมงานคนขายมาสั่งของ: หากผู้คอมเมนต์เป็นคนขาย (เช่น {sellers_label}) แต่ข้อความเป็น "การสั่งซื้ออาหารให้ลูกค้า" (ไม่ใช่การพิมพ์รับออเดอร์) และยังไม่มีใครตอบรับออเดอร์ ให้ถือว่าเป็นออเดอร์ที่ต้องแจ้งเตือนด้วย
+4. กรณีทีมงานคนขายมาสั่งของ: หากผู้คอมเมนต์เป็นคนขาย ({sellers_label}) ที่พิมพ์สั่งอาหารแทนลูกค้าอย่างชัดเจน และยังไม่มีใครตอบรับออเดอร์ ให้ถือว่าเป็นออเดอร์ที่ต้องแจ้งเตือน แต่ถ้าเป็นสติกเกอร์ ข้อความตอบรับ ข้อความขอบคุณ หรือข้อความอื่นๆ ห้ามแจ้งเตือนเด็ดขาด
 
 รายการคอมเมนต์ที่จะตรวจ (JSON):
 {json.dumps(simplified_comments, ensure_ascii=False, indent=2)}
@@ -164,11 +272,14 @@ def analyze_with_gemini(comments: list, post_author: str = "") -> list:
     unreplied = []
     for item in results:
         if item.get("is_unreplied_order"):
+            c_id = item.get("id")
+            orig = next((c for c in comments if c.get("id") == c_id), {})
             unreplied.append({
-                "id": item.get("id"),
+                "id": c_id,
                 "customer_name": item.get("customer_name"),
                 "text": item.get("text"),
-                "reason": item.get("reason", "ยังไม่มีการตอบรับออเดอร์")
+                "reason": item.get("reason", "ยังไม่มีการตอบรับออเดอร์"),
+                "post_url": orig.get("post_url", "")
             })
     return unreplied
 
@@ -202,24 +313,20 @@ def analyze_with_rules(comments: list, post_author: str = "") -> list:
         full_thread_text = c.get("full_thread_text", "").lower()
         text_lower = text.lower()
 
-        is_creator = check_is_post_author(author, has_badge, post_author)
-        # 1. ถ้าเป็น "คนโพสต์" (เจ้าของโพสต์ / ผู้เขียน) ให้ข้ามเสมอ!
-        # เจ้าของโพสต์ไม่มีทางคอมเมนต์สั่งอาหารจากโพสต์ของตัวเองเด็ดขาด (มีแต่แจ้งข้อมูล/ตอบรับ)
-        if is_creator:
-            continue
-
-        # 2. ถ้าเป็นข้อความประกาศหรือแจ้งรายละเอียดของร้าน (เช่น "พร้อมจัดส่งทุกหมู่บ้าน") ให้ข้าม
-        if any(kw in text_lower for kw in ANNOUNCEMENT_KEYWORDS):
-            continue
-
         is_seller = check_is_seller(author, has_badge, post_author)
-        has_confirm_in_own = any(kw in text_lower for kw in CONFIRM_KEYWORDS)
 
-        # 3. ถ้าเป็นคนขายคนอื่น (เช่น แม่บี) และข้อความเป็นคำยืนยันรับออเดอร์ ให้ข้าม
-        if is_seller and has_confirm_in_own:
-            continue
+        # 1. หากผู้คอมเมนต์เป็นคนขาย (ตามรายชื่อ POST_AUTHOR_NAME หรือ Author badge)
+        if is_seller:
+            # เช็คว่าเป็นการสั่งอาหารแทนลูกค้าท่านอื่นจริงหรือไม่
+            # ถ้าเป็นสติกเกอร์ ข้อความรับออเดอร์ ประกาศร้าน หรือข้อความอื่นๆ ที่ไม่ใช่การสั่งอาหาร -> ข้ามทันที ไม่ต้องแจ้งเตือน!
+            if not is_seller_ordering_for_customer(text):
+                continue
+        else:
+            # 2. ถ้าเป็นลูกค้าทั่วไป แล้วเป็นข้อความประกาศร้าน ให้ข้าม
+            if any(kw in text_lower for kw in ANNOUNCEMENT_KEYWORDS):
+                continue
 
-        # 1. ตรวจสอบว่าใน replies หรือใน thread มีคำยืนยันรับออเดอร์แล้วหรือไม่
+        # 3. ตรวจสอบว่าใน replies หรือใน thread มีคำยืนยันรับออเดอร์แล้วหรือไม่
         has_confirmation = False
 
         # ตรวจสอบใน replies ว่ามีคนขายคนใดมาตอบรับออเดอร์แล้วหรือไม่
@@ -232,7 +339,7 @@ def analyze_with_rules(comments: list, post_author: str = "") -> list:
             if has_confirmation:
                 break
 
-        # 2. ตรวจสอบข้ามคอมเมนต์: คนขายพิมพ์ตอบรับโดยแท็กชื่อลูกค้าในคอมเมนต์แยกต่างหากหรือไม่
+        # ตรวจสอบข้ามคอมเมนต์: คนขายพิมพ์ตอบรับโดยแท็กชื่อลูกค้าในคอมเมนต์แยกต่างหากหรือไม่
         if not has_confirmation and author:
             author_first_name = author.split()[0].lower()
             author_full_name = author.lower()
@@ -242,17 +349,26 @@ def analyze_with_rules(comments: list, post_author: str = "") -> list:
                     has_confirmation = True
                     break
 
-        # 3. ถ้ายังไม่มีการยืนยัน ให้ตรวจว่าเป็นออเดอร์หรือไม่
+        # 4. ถ้ายังไม่มีการยืนยัน ให้ตรวจว่าเป็นออเดอร์หรือไม่
         if not has_confirmation:
-            is_order = any(k in text_lower for k in ORDER_KEYWORDS) or "[📷 มีแนบรูปภาพ]" in text
-
-            if is_order:
-                display_author = f"{author} (สั่งให้ลูกค้า)" if is_seller else (author or "ลูกค้า")
+            if is_seller:
+                # กรณีคนขายสั่งแทนลูกค้า (และผ่านการเช็ค is_seller_ordering_for_customer แล้ว)
                 unreplied.append({
                     "id": c_id,
-                    "customer_name": display_author,
+                    "customer_name": f"{author} (สั่งให้ลูกค้า)",
                     "text": text,
-                    "reason": "พบคำสั่งซื้อ แต่ยังไม่พบข้อความ 'รับออเดอร์' ในคำตอบกลับ"
+                    "reason": "พบคนขายสั่งอาหารแทนลูกค้า แต่ยังไม่พบข้อความ 'รับออเดอร์' ในคำตอบกลับ",
+                    "post_url": c.get("post_url", "")
                 })
+            else:
+                is_order = any(k in text_lower for k in ORDER_KEYWORDS) or ("[📷 มีแนบรูปภาพ]" in text and "[สติกเกอร์]" not in text)
+                if is_order:
+                    unreplied.append({
+                        "id": c_id,
+                        "customer_name": author or "ลูกค้า",
+                        "text": text,
+                        "reason": "พบคำสั่งซื้อ แต่ยังไม่พบข้อความ 'รับออเดอร์' ในคำตอบกลับ",
+                        "post_url": c.get("post_url", "")
+                    })
 
     return unreplied
