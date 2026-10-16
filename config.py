@@ -13,8 +13,8 @@ IS_MAC = platform.system() == "Darwin"
 # ตั้งค่า URL ของโพสต์ (รองรับหลายโพสต์ โดยคั่นด้วยเครื่องหมายจุลภาค , หรือขึ้นบรรทัดใหม่)
 raw_post_urls = (os.getenv("POST_URLS", "") or os.getenv("POST_URL", "")).strip()
 POST_URLS = [
-    u.strip() for u in raw_post_urls.replace("\n", ",").split(",") 
-    if u.strip() and "facebook.com" in u
+    u.strip().strip('"').strip("'") for u in raw_post_urls.replace("\n", ",").split(",") 
+    if u.strip() and ("facebook.com" in u or "fb.com" in u or "fb.watch" in u)
 ]
 POST_URL = POST_URLS[0] if POST_URLS else ""
 

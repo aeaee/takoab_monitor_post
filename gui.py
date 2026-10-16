@@ -267,16 +267,51 @@ class TakoabMonitorGUI:
         )
         settings_card.pack(fill=tk.BOTH, expand=True)
 
-        # Post URLs
+        # Post URLs Header & Action Buttons
+        url_header = tk.Frame(settings_card, bg=self.c_card)
+        url_header.pack(fill=tk.X, pady=(0, 4))
+
         lbl_urls = tk.Label(
-            settings_card,
-            text="📌 ลิงก์โพสต์ Facebook ที่ต้องการเฝ้าดู (1 บรรทัดต่อ 1 โพสต์):",
+            url_header,
+            text="📌 ลิงก์โพสต์ Facebook (1 บรรทัดต่อ 1 โพสต์):",
             font=self.font_label_bold,
             fg=self.c_text,
             bg=self.c_card,
             anchor="w"
         )
-        lbl_urls.pack(fill=tk.X, pady=(0, 4))
+        lbl_urls.pack(side=tk.LEFT)
+
+        btn_clear_urls = tk.Button(
+            url_header,
+            text="🧹 ล้าง",
+            font=self.font_btn_sub,
+            fg=self.c_muted,
+            bg=self.c_btn,
+            activebackground=self.c_btn_hover,
+            activeforeground=self.c_text,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=2,
+            command=self.clear_urls
+        )
+        btn_clear_urls.pack(side=tk.RIGHT)
+
+        btn_paste_url = tk.Button(
+            url_header,
+            text="📋 วางลิงก์ (Paste)",
+            font=self.font_btn_sub,
+            fg="white",
+            bg=self.c_accent,
+            activebackground=self.c_accent_hover,
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=10,
+            pady=2,
+            command=self.paste_to_urls
+        )
+        btn_paste_url.pack(side=tk.RIGHT, padx=(0, 6))
 
         self.txt_urls = scrolledtext.ScrolledText(
             settings_card,
@@ -289,7 +324,8 @@ class TakoabMonitorGUI:
             bd=1,
             spacing1=3,
             spacing2=3,
-            spacing3=3
+            spacing3=3,
+            undo=True
         )
         self.txt_urls.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
@@ -471,7 +507,200 @@ class TakoabMonitorGUI:
         )
         self.txt_log.pack(fill=tk.BOTH, expand=True)
 
+        # Enable Right-Click context menus & Thai keyboard shortcut support (Ctrl+V, Ctrl+C, Ctrl+A)
+        self._enable_context_menu_and_shortcuts(self.txt_urls)
+        self._enable_context_menu_and_shortcuts(self.ent_interval)
+        self._enable_context_menu_and_shortcuts(self.ent_hours)
+        self._enable_context_menu_and_shortcuts(self.ent_author)
+        self._enable_context_menu_and_shortcuts(self.txt_log, readonly=True)
+
         self.log_message("[*] Takoab Monitor พร้อมทำงาน กรุณาตรวจสอบลิงก์แล้วกด [เริ่มทำงาน]\n")
+
+    def clear_urls(self):
+        """ล้างข้อความในช่องลิงก์โพสต์"""
+        self.txt_urls.delete("1.0", tk.END)
+        self.txt_urls.focus_set()
+
+    def paste_to_urls(self):
+        """วางลิงก์จากคลิปบอร์ดลงในช่องลิงก์โพสต์โดยตรง"""
+        try:
+            text = self.root.clipboard_get().strip()
+        except Exception:
+            messagebox.showinfo(
+                "คลิปบอร์ดว่าง", 
+                "ไม่พบข้อความในคลิปบอร์ด\nกรุณากดคัดลอก (Copy) ลิงก์โพสต์ Facebook ก่อนกดปุ่มนี้ครับ"
+            )
+            return
+
+        if not text:
+            return
+
+        cleaned_lines = []
+        for line in text.splitlines():
+            s = line.strip().strip('"').strip("'")
+            if s:
+                cleaned_lines.append(s)
+        pasted_text = "\n".join(cleaned_lines) if cleaned_lines else text
+
+        try:
+            # หากมีการไฮไลต์เลือกข้อความไว้ ให้แทนที่ตำแหน่งที่เลือก
+            self.txt_urls.delete("sel.first", "sel.last")
+            self.txt_urls.insert(tk.INSERT, pasted_text)
+        except tk.TclError:
+            current = self.txt_urls.get("1.0", tk.END).strip()
+            if not current:
+                self.txt_urls.insert("1.0", pasted_text)
+            else:
+                # ถ้ามีลิงก์เดิมอยู่แล้วและเคอร์เซอร์อยู่ท้ายสุด ให้ขึ้นบรรทัดใหม่
+                insert_idx = self.txt_urls.index(tk.INSERT)
+                end_idx = self.txt_urls.index("end-1c")
+                if insert_idx == end_idx:
+                    separator = "\n" if not current.endswith("\n") else ""
+                    self.txt_urls.insert(tk.END, separator + pasted_text)
+                else:
+                    self.txt_urls.insert(tk.INSERT, pasted_text)
+
+        self.txt_urls.focus_set()
+        self.txt_urls.see(tk.INSERT)
+        self.log_message("[*] นำเข้าลิงก์จากคลิปบอร์ดเรียบร้อยแล้ว (อย่าลืมกด [💾 บันทึกการตั้งค่า])\n")
+
+    def _enable_context_menu_and_shortcuts(self, widget, readonly=False):
+        """
+        1. เพิ่มเมนูคลิกขวา (ตัด, คัดลอก, วาง, เลือกทั้งหมด) สำหรับทั้ง Text และ Entry
+        2. แก้ไขปัญหาคีย์ลัด Ctrl+V, Ctrl+C, Ctrl+X, Ctrl+A, Ctrl+Z ไม่ทำงานบน Windows
+           เมื่อผู้ใช้เปิดสลับแป้นพิมพ์เป็นภาษาไทย (TH)
+        """
+        menu = tk.Menu(
+            self.root,
+            tearoff=0,
+            bg=self.c_card,
+            fg=self.c_text,
+            activebackground=self.c_accent,
+            activeforeground="white",
+            font=self.font_input,
+            bd=1,
+            relief=tk.SOLID
+        )
+
+        def do_cut():
+            do_copy()
+            if not readonly:
+                try:
+                    if isinstance(widget, tk.Text):
+                        widget.delete("sel.first", "sel.last")
+                    elif isinstance(widget, tk.Entry):
+                        widget.delete("sel.first", "sel.last")
+                except tk.TclError:
+                    pass
+
+        def do_copy():
+            try:
+                if isinstance(widget, tk.Text):
+                    text = widget.get("sel.first", "sel.last")
+                elif isinstance(widget, tk.Entry):
+                    text = widget.selection_get()
+                else:
+                    return
+                if text:
+                    self.root.clipboard_clear()
+                    self.root.clipboard_append(text)
+            except (tk.TclError, Exception):
+                pass
+
+        def do_paste():
+            if readonly:
+                return
+            try:
+                text = self.root.clipboard_get()
+            except Exception:
+                return
+            if not text:
+                return
+            try:
+                if isinstance(widget, tk.Text):
+                    try:
+                        widget.delete("sel.first", "sel.last")
+                    except tk.TclError:
+                        pass
+                    widget.insert(tk.INSERT, text)
+                    widget.see(tk.INSERT)
+                elif isinstance(widget, tk.Entry):
+                    try:
+                        widget.delete("sel.first", "sel.last")
+                    except tk.TclError:
+                        pass
+                    widget.insert(tk.INSERT, text)
+            except Exception:
+                pass
+
+        def do_select_all():
+            try:
+                if isinstance(widget, tk.Text):
+                    widget.tag_add("sel", "1.0", "end-1c")
+                    widget.mark_set(tk.INSERT, "1.0")
+                elif isinstance(widget, tk.Entry):
+                    widget.selection_range(0, tk.END)
+                    widget.icursor(tk.END)
+            except Exception:
+                pass
+
+        if not readonly:
+            menu.add_command(label="✂ ตัด (Cut)", command=do_cut, accelerator="Ctrl+X")
+        menu.add_command(label="📄 คัดลอก (Copy)", command=do_copy, accelerator="Ctrl+C")
+        if not readonly:
+            menu.add_command(label="📋 วาง (Paste)", command=do_paste, accelerator="Ctrl+V")
+        menu.add_separator()
+        menu.add_command(label="🔘 เลือกทั้งหมด (Select All)", command=do_select_all, accelerator="Ctrl+A")
+
+        def show_popup(event):
+            widget.focus_set()
+            if isinstance(widget, tk.Entry):
+                try:
+                    if not widget.selection_present():
+                        widget.icursor(widget.index(f"@{event.x}"))
+                except Exception:
+                    pass
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+
+        # คลิกขวา (Windows / Linux: Button-3, macOS: Button-2 หรือ Button-3)
+        widget.bind("<Button-3>", show_popup)
+        if sys.platform == "darwin":
+            widget.bind("<Button-2>", show_popup)
+
+        # จัดการปุ่มลัดเมื่อคีย์บอร์ดถูกสลับเป็นภาษาไทย (Windows Keycode: 86=V, 67=C, 88=X, 65=A, 90=Z)
+        def on_key_press(event):
+            is_mod = bool((event.state & 4) or (sys.platform == "darwin" and (event.state & 8)))
+            if not is_mod:
+                return None
+            code = event.keycode
+            sym = (event.keysym or "").lower()
+            if code == 86 or sym == "v":
+                if not readonly:
+                    do_paste()
+                    return "break"
+            elif code == 67 or sym == "c":
+                do_copy()
+                return "break"
+            elif code == 88 or sym == "x":
+                if not readonly:
+                    do_cut()
+                    return "break"
+            elif code == 65 or sym == "a":
+                do_select_all()
+                return "break"
+            elif code == 90 or sym == "z":
+                if not readonly and isinstance(widget, tk.Text):
+                    try:
+                        widget.edit_undo()
+                    except tk.TclError:
+                        pass
+                    return "break"
+            return None
+
+        widget.bind("<KeyPress>", on_key_press)
 
     # -----------------------------------------------------------------
     # Configuration Load / Save (.env)
@@ -495,7 +724,7 @@ class TakoabMonitorGUI:
 
         # URLs
         raw_urls = env_dict.get("POST_URLS", "") or env_dict.get("POST_URL", "")
-        clean_urls = [u.strip() for u in raw_urls.replace("\n", ",").split(",") if u.strip()]
+        clean_urls = [u.strip().strip('"').strip("'") for u in raw_urls.replace("\n", ",").split(",") if u.strip()]
         self.txt_urls.delete("1.0", tk.END)
         if clean_urls:
             self.txt_urls.insert(tk.END, "\n".join(clean_urls))
@@ -519,7 +748,7 @@ class TakoabMonitorGUI:
     def save_env_settings(self):
         """บันทึกค่ากลับลงไฟล์ .env โดยรักษาคอมเมนต์และโครงสร้างเดิม"""
         urls_input = self.txt_urls.get("1.0", tk.END).strip()
-        url_list = [u.strip() for u in urls_input.replace("\n", ",").split(",") if u.strip()]
+        url_list = [u.strip().strip('"').strip("'") for u in urls_input.replace("\n", ",").split(",") if u.strip()]
         formatted_urls = ", ".join(url_list)
 
         interval = self.ent_interval.get().strip() or "180"
