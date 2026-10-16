@@ -126,9 +126,13 @@ def show_modal_dialog(customer_name: str, message: str, duration: int = 60, post
     t = threading.Thread(target=_run, daemon=True)
     t.start()
 
-def send_telegram_alert(customer_name: str, message: str, reason: str = "", post_url: str = ""):
+def send_telegram_alert(customer_name: str, message: str, reason: str = "", post_url: str = "", sync: bool = False):
     """ส่งการแจ้งเตือนเข้า Telegram ทุกแชท/กลุ่มที่ระบุไว้"""
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_IDS:
+    if not TELEGRAM_BOT_TOKEN:
+        print("[!] ไม่พบ TELEGRAM_BOT_TOKEN ใน .env")
+        return
+    if not TELEGRAM_CHAT_IDS:
+        print("[!] ไม่พบ TELEGRAM_CHAT_ID ใน .env")
         return
 
     import html
@@ -163,9 +167,12 @@ def send_telegram_alert(customer_name: str, message: str, reason: str = "", post
             except Exception as e:
                 print(f"[!] เกิดข้อผิดพลาดในการส่ง Telegram ({cid}): {e}")
 
-    threading.Thread(target=_send, daemon=True).start()
+    if sync:
+        _send()
+    else:
+        threading.Thread(target=_send, daemon=True).start()
 
-def send_telegram_status(status_text: str):
+def send_telegram_status(status_text: str, sync: bool = False):
     """ส่งข้อความสถานะปกติเข้า Telegram ทุกแชทแบบไร้เสียง (Silent Message ไม่สั่น/ไม่ส่งเสียงรบกวน)"""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_IDS:
         return
@@ -181,11 +188,18 @@ def send_telegram_status(status_text: str):
                 "disable_notification": True
             }
             try:
-                requests.post(url, json=payload, timeout=10)
-            except Exception:
-                pass
+                resp = requests.post(url, json=payload, timeout=10)
+                if resp.status_code == 200:
+                    print(f"   📱 ส่งสถานะเข้า Telegram ({cid}) เรียบร้อยแล้ว")
+                else:
+                    print(f"[!] ส่งสถานะ Telegram ({cid}) ไม่สำเร็จ ({resp.status_code}): {resp.text}")
+            except Exception as e:
+                print(f"[!] เกิดข้อผิดพลาดในการส่งสถานะ Telegram ({cid}): {e}")
 
-    threading.Thread(target=_send, daemon=True).start()
+    if sync:
+        _send()
+    else:
+        threading.Thread(target=_send, daemon=True).start()
 
 def notify_unreplied_order(customer_name: str, comment_text: str, reason: str = "", post_url: str = ""):
     """ส่งการแจ้งเตือนเมื่อพบออเดอร์ที่ยังไม่มีการตอบรับ"""

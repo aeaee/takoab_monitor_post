@@ -20,7 +20,8 @@ from fb_scraper import get_browser_context, manual_login, extract_comments_from_
 from analyzer import analyze_comments
 from notifier import (
     load_cache, save_cache, notify_unreplied_order, 
-    play_alert_sound, send_system_banner, show_modal_dialog, send_telegram_status
+    play_alert_sound, send_system_banner, show_modal_dialog, send_telegram_status,
+    send_telegram_alert
 )
 
 def test_notification():
@@ -37,7 +38,14 @@ def test_notification():
         message="สั่งทาโกะยากิ 2 กล่อง\n(ทดสอบระบบหน้าต่างแจ้งเตือน)",
         duration=15
     )
-    send_telegram_status("🧪 <b>ทดสอบข้อความสถานะปกติ (แบบไร้เสียง)</b> สำเร็จเรียบร้อย!")
+    print("[*] กำลังส่งแจ้งเตือนออเดอร์ทดสอบเข้า Telegram...")
+    send_telegram_alert(
+        customer_name="คุณสมชาย (ทดสอบระบบ)",
+        message="สั่งทาโกะยากิ 2 กล่อง\n(ข้อความทดสอบแจ้งเตือนจาก Takoab Monitor)",
+        reason="ทดสอบระบบการแจ้งเตือน",
+        sync=True
+    )
+    send_telegram_status("🧪 <b>ทดสอบข้อความสถานะปกติ (แบบไร้เสียง)</b> สำเร็จเรียบร้อย!", sync=True)
     print("[✓] ส่งการแจ้งเตือนทดสอบเรียบร้อยแล้ว!")
 
 def run_monitor(once: bool = False):
