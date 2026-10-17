@@ -29,8 +29,8 @@ class TakoabMonitorGUI:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Takoab Post Monitor - ระบบเฝ้าดูคอมเมนต์ออเดอร์")
-        self.root.geometry("1140x740")
-        self.root.minsize(980, 640)
+        self.root.geometry("1160x800")
+        self.root.minsize(980, 680)
         self.root.configure(bg="#0f172a")
 
         # Select the best native Thai font for Windows
@@ -253,7 +253,167 @@ class TakoabMonitorGUI:
         )
         self.btn_clear_cache.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(4, 0))
 
-        # 2. Configuration Settings Card
+        # 2. Test Order into Telegram Card
+        test_order_card = tk.LabelFrame(
+            left_panel,
+            text=" 🧪 ทดสอบส่งออเดอร์เข้า Telegram ",
+            font=self.font_card_title,
+            fg=self.c_text,
+            bg=self.c_card,
+            bd=1,
+            relief=tk.SOLID,
+            padx=12,
+            pady=10
+        )
+        test_order_card.pack(fill=tk.X, pady=(0, 10))
+
+        # Customer Name Input Row
+        row_test_name = tk.Frame(test_order_card, bg=self.c_card)
+        row_test_name.pack(fill=tk.X, pady=(0, 6))
+
+        lbl_test_name = tk.Label(
+            row_test_name,
+            text="ชื่อลูกค้า:",
+            font=self.font_label_bold,
+            fg=self.c_text,
+            bg=self.c_card,
+            width=9,
+            anchor="w"
+        )
+        lbl_test_name.pack(side=tk.LEFT)
+
+        self.ent_test_name = tk.Entry(
+            row_test_name,
+            font=self.font_input,
+            bg=self.c_input_bg,
+            fg="#f8fafc",
+            insertbackground="white",
+            relief=tk.FLAT,
+            bd=1
+        )
+        self.ent_test_name.insert(0, "คุณอุ้มฤทัย (ทดสอบ)")
+        self.ent_test_name.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._enable_context_menu_and_shortcuts(self.ent_test_name)
+
+        # Comment Text Input Row
+        row_test_comment = tk.Frame(test_order_card, bg=self.c_card)
+        row_test_comment.pack(fill=tk.X, pady=(0, 6))
+
+        lbl_test_comment = tk.Label(
+            row_test_comment,
+            text="คอมเมนต์:",
+            font=self.font_label_bold,
+            fg=self.c_text,
+            bg=self.c_card,
+            width=9,
+            anchor="nw"
+        )
+        lbl_test_comment.pack(side=tk.LEFT, anchor="nw", pady=(3, 0))
+
+        self.txt_test_comment = tk.Text(
+            row_test_comment,
+            height=3,
+            font=self.font_input,
+            bg=self.c_input_bg,
+            fg="#f8fafc",
+            insertbackground="white",
+            relief=tk.FLAT,
+            bd=1,
+            wrap=tk.WORD
+        )
+        self.txt_test_comment.insert("1.0", "มาม่าไก่กรอบคลุกซอส ไม่เผ็ด (แยกสาหร่าย) 2 ไก่กรอบคลุกซอสเกาหลี 1 194/119 ซ.6/2 ใช้ไทยพลัสค่ะ")
+        self.txt_test_comment.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._enable_context_menu_and_shortcuts(self.txt_test_comment)
+
+        # Quick Presets Row
+        preset_row = tk.Frame(test_order_card, bg=self.c_card)
+        preset_row.pack(fill=tk.X, pady=(0, 6))
+
+        lbl_preset = tk.Label(
+            preset_row,
+            text="ตัวอย่างเร็ว:",
+            font=self.font_btn_sub,
+            fg=self.c_muted,
+            bg=self.c_card,
+            anchor="w"
+        )
+        lbl_preset.pack(side=tk.LEFT, padx=(0, 4))
+
+        btn_p1 = tk.Button(
+            preset_row,
+            text="🍜 มาม่าไก่กรอบ",
+            font=self.font_btn_sub,
+            fg=self.c_text,
+            bg=self.c_btn,
+            activebackground=self.c_btn_hover,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=6,
+            pady=1,
+            command=lambda: self._set_test_preset("มาม่าไก่กรอบคลุกซอส ไม่เผ็ด (แยกสาหร่าย) 2 ไก่กรอบคลุกซอสเกาหลี 1 194/119 ซ.6/2 ใช้ไทยพลัสค่ะ", "คุณอุ้มฤทัย (ทดสอบ)")
+        )
+        btn_p1.pack(side=tk.LEFT, padx=2)
+
+        btn_p2 = tk.Button(
+            preset_row,
+            text="🐙 ทาโกะยากิ",
+            font=self.font_btn_sub,
+            fg=self.c_text,
+            bg=self.c_btn,
+            activebackground=self.c_btn_hover,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=6,
+            pady=1,
+            command=lambda: self._set_test_preset("ทาโกะยากิปลาหมึก ปูอัด ไส้กรอก S 1 สปาเก็ตตี้เบคอนพริกแห้ง 1 ข้าวไก่กรอบซอสเทอริยากิ 1 199/125 ซ.9 สแกน หน้าบ้าน", "คุณสมชาย (ทดสอบ)")
+        )
+        btn_p2.pack(side=tk.LEFT, padx=2)
+
+        btn_clear_test = tk.Button(
+            preset_row,
+            text="🧹 ล้าง",
+            font=self.font_btn_sub,
+            fg=self.c_muted,
+            bg=self.c_btn,
+            activebackground=self.c_btn_hover,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=6,
+            pady=1,
+            command=self._clear_test_order_inputs
+        )
+        btn_clear_test.pack(side=tk.LEFT, padx=2)
+
+        # Test Order Action Row
+        test_action_row = tk.Frame(test_order_card, bg=self.c_card)
+        test_action_row.pack(fill=tk.X, pady=(2, 0))
+
+        self.btn_send_test_order = tk.Button(
+            test_action_row,
+            text="🚀 ส่งทดสอบเข้า Telegram",
+            font=self.font_btn_main,
+            fg="white",
+            bg="#0284c7",
+            activebackground="#0369a1",
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=12,
+            pady=5,
+            command=self.send_test_order_action
+        )
+        self.btn_send_test_order.pack(side=tk.LEFT)
+
+        self.lbl_test_order_status = tk.Label(
+            test_action_row,
+            text="",
+            font=self.font_btn_sub,
+            fg="#10b981",
+            bg=self.c_card
+        )
+        self.lbl_test_order_status.pack(side=tk.LEFT, padx=(10, 0))
+
+        # 3. Configuration Settings Card
         settings_card = tk.LabelFrame(
             left_panel,
             text=" ตั้งค่าระบบ (.env) ",
@@ -315,7 +475,7 @@ class TakoabMonitorGUI:
 
         self.txt_urls = scrolledtext.ScrolledText(
             settings_card,
-            height=6,
+            height=4,
             font=self.font_input,
             bg=self.c_input_bg,
             fg="#e2e8f0",
@@ -958,6 +1118,59 @@ class TakoabMonitorGUI:
             subprocess.Popen(f'start "Facebook Login" cmd.exe /c "{cmd_str}"', cwd=str(BASE_DIR), shell=True)
         else:
             subprocess.Popen([str(VENV_PYTHON), "main.py", "--login"], cwd=str(BASE_DIR))
+
+    def _set_test_preset(self, comment: str, name: str = ""):
+        """เลือกข้อความตัวอย่างสำหรับทดสอบ"""
+        if name:
+            self.ent_test_name.delete(0, tk.END)
+            self.ent_test_name.insert(0, name)
+        self.txt_test_comment.delete("1.0", tk.END)
+        self.txt_test_comment.insert("1.0", comment)
+
+    def _clear_test_order_inputs(self):
+        """ล้างช่องป้อนข้อความทดสอบ"""
+        self.ent_test_name.delete(0, tk.END)
+        self.ent_test_name.insert(0, "ทดสอบ ลูกค้า Facebook")
+        self.txt_test_comment.delete("1.0", tk.END)
+
+    def send_test_order_action(self):
+        """ส่งข้อความออเดอร์ทดสอบไปยัง Telegram ผ่าน Takoab POS API"""
+        name = self.ent_test_name.get().strip() or "ทดสอบ ลูกค้า Facebook"
+        comment = self.txt_test_comment.get("1.0", tk.END).strip()
+        if not comment:
+            messagebox.showwarning("คำเตือน", "กรุณาระบุข้อความคอมเมนต์สำหรับทดสอบออเดอร์")
+            return
+
+        self.btn_send_test_order.configure(state=tk.DISABLED, text="⏳ กำลังส่ง...")
+        self.lbl_test_order_status.configure(text="กำลังส่งเข้า Telegram...", fg="#38bdf8")
+        self.log_message(f"\n[*] 🧪 เริ่มส่งออเดอร์ทดสอบเข้า Telegram (ลูกค้า: {name})...\n")
+
+        def _worker():
+            try:
+                from notifier import send_pos_draft_order
+                res = send_pos_draft_order(customer_name=name, comment_text=comment, reason="ทดสอบระบบ Telegram Draft", sync=True)
+                if res and res.get("success"):
+                    draft_id = res.get("draft_id", "-")
+                    msg = f"✓ ส่งสำเร็จ! (Draft ID: {draft_id})"
+                    self.log_queue.put(f"[✓] สร้างร่างออเดอร์ใน Telegram สำเร็จ! (Draft ID: {draft_id})\n👉 ตรวจสอบคำถามและการตอบกลับใน Telegram ของร้านได้ทันที\n")
+                    self.root.after(0, lambda: self._on_test_order_done(True, msg))
+                else:
+                    err = res.get("error", "ไม่สามารถส่งไปยัง POS Draft API ได้") if res else "เกิดข้อผิดพลาด"
+                    self.log_queue.put(f"[!] ส่งออเดอร์ทดสอบไม่สำเร็จ: {err}\n")
+                    self.root.after(0, lambda: self._on_test_order_done(False, f"✕ ล้มเหลว: {err[:25]}"))
+            except Exception as e:
+                self.log_queue.put(f"[!] เกิดข้อผิดพลาดในการส่ง: {e}\n")
+                self.root.after(0, lambda: self._on_test_order_done(False, f"✕ ข้อผิดพลาด: {str(e)[:25]}"))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_test_order_done(self, success: bool, msg: str):
+        self.btn_send_test_order.configure(state=tk.NORMAL, text="🚀 ส่งทดสอบเข้า Telegram")
+        self.lbl_test_order_status.configure(
+            text=msg,
+            fg="#10b981" if success else "#ef4444"
+        )
+        self.root.after(8000, lambda: self.lbl_test_order_status.configure(text=""))
 
     def test_notification(self):
         """รันคำสั่งทดสอบระบบแจ้งเตือนและเสียง"""

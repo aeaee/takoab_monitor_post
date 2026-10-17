@@ -21,7 +21,7 @@ from analyzer import analyze_comments
 from notifier import (
     load_cache, save_cache, notify_unreplied_order, 
     play_alert_sound, send_system_banner, show_modal_dialog, send_telegram_status,
-    send_telegram_alert
+    send_telegram_alert, send_pos_draft_order
 )
 
 def test_notification():
@@ -47,6 +47,28 @@ def test_notification():
     )
     send_telegram_status("🧪 <b>ทดสอบข้อความสถานะปกติ (แบบไร้เสียง)</b> สำเร็จเรียบร้อย!", sync=True)
     print("[✓] ส่งการแจ้งเตือนทดสอบเรียบร้อยแล้ว!")
+
+def test_order(customer_name: str = "", comment_text: str = ""):
+    """ทดสอบส่งออเดอร์เข้า Telegram เพื่อทดสอบการทำงานของคำถามโต้ตอบและร่างออเดอร์"""
+    name = customer_name.strip() or "ทดสอบ ลูกค้า Facebook"
+    comment = comment_text.strip() or "มาม่าไก่กรอบคลุกซอส ไม่เผ็ด (แยกสาหร่าย) 2 ไก่กรอบคลุกซอสเกาหลี 1 194/119 ซ.6/2 ใช้ไทยพลัสค่ะ"
+
+    print("\n" + "=" * 60)
+    print("🧪 เริ่มทดสอบส่งออเดอร์เข้า Telegram")
+    print(f"👤 ชื่อลูกค้า: {name}")
+    print(f"💬 ข้อความคอมเมนต์: {comment}")
+    print("=" * 60)
+    print("[*] กำลังส่งข้อมูลไปยัง POS Telegram Draft API...")
+
+    res = send_pos_draft_order(customer_name=name, comment_text=comment, reason="ทดสอบระบบ Telegram Draft", sync=True)
+    if res and res.get("success"):
+        draft_id = res.get("draft_id", "-")
+        print(f"\n[✓] สร้างร่างออเดอร์เข้า Telegram สำเร็จ! (Draft ID: {draft_id})")
+        print("👉 กรุณาเปิดแอป Telegram เพื่อทดสอบตอบคำถามและยืนยันออเดอร์ได้ทันที")
+    else:
+        err = res.get("error") if res else "เกิดข้อผิดพลาด"
+        print(f"\n[!] ส่งออเดอร์ทดสอบไม่สำเร็จ: {err}")
+
 
 def run_monitor(once: bool = False):
     """รันระบบเฝ้าดูคอมเมนต์ในโพสต์ (รองรับหลายโพสต์)"""
@@ -259,6 +281,9 @@ def main():
     parser.add_argument("--test-notify", action="store_true", help="ทดสอบระบบเสียงและการแจ้งเตือนบน Mac")
     parser.add_argument("--clear-cache", action="store_true", help="ล้างประวัติคอมเมนต์ที่เคยแจ้งเตือนแล้ว")
     parser.add_argument("--telegram-setup", action="store_true", help="เชื่อมต่อและค้นหา Telegram Chat ID อัตโนมัติ")
+    parser.add_argument("--test-order", action="store_true", help="ส่งทดสอบออเดอร์เข้า Telegram โดยระบุชื่อและคอมเมนต์")
+    parser.add_argument("--name", type=str, default="", help="ชื่อลูกค้าสำหรับการทดสอบ (ใช้ร่วมกับ --test-order)")
+    parser.add_argument("--comment", type=str, default="", help="ข้อความคอมเมนต์สำหรับการทดสอบ (ใช้ร่วมกับ --test-order)")
 
     args = parser.parse_args()
 
@@ -270,6 +295,8 @@ def main():
         clear_cache()
     elif args.telegram_setup:
         setup_telegram()
+    elif args.test_order:
+        test_order(customer_name=args.name, comment_text=args.comment)
     elif args.check_once:
         run_monitor(once=True)
     elif args.watch:
@@ -280,6 +307,8 @@ def main():
         print("  1. python main.py --login           # ล็อกอิน Facebook ครั้งแรก")
         print("  2. python main.py --telegram-setup  # เชื่อมต่อ Telegram Chat ID อัตโนมัติ")
         print("  3. python main.py --watch           # เริ่มเฝ้าดูโพสต์และแจ้งเตือน")
+        print("  4. python main.py --test-order      # ทดสอบส่งออเดอร์เข้า Telegram")
+        print("  5. python main.py --test-order --name \"คุณสมชาย\" --comment \"ทาโกะยากิ 1 กล่อง\"")
 
 if __name__ == "__main__":
     main()

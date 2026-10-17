@@ -202,20 +202,31 @@ def send_telegram_status(status_text: str, sync: bool = False):
         threading.Thread(target=_send, daemon=True).start()
 
 
-def send_pos_draft_order(customer_name: str, comment_text: str, post_url: str = "", reason: str = ""):
+def send_pos_draft_order(
+    customer_name: str,
+    comment_text: str,
+    post_url: str = "",
+    reason: str = "",
+    sync: bool = False
+) -> dict:
     """
     ส่งข้อมูลออเดอร์ไปที่ Takoab POS เพื่อสร้างร่างออเดอร์เข้า Telegram ในข้อความเดียว
     (รวมทั้งคอมเมนต์ต้นฉบับ ลิงก์โพสต์ รายการอาหาร และปุ่มกดอนุมัติเข้าครัว/ไม่อนุมัติ)
-    หากเชื่อมต่อ POS ไม่สำเร็จ จะ fallback ส่งแบบแจ้งเตือนธรรมดาแทนอัตโนมัติ
+    หากเชื่อมต่อ POS ไม่สำเร็จ จะ fallback ส่งแบบแจ้งเตือนธรรมดาแทนอัตโนมัติ (เมื่อ sync=False)
     """
     pos_api_url = os.getenv("POS_DRAFT_API_URL", "https://takoab-api.aeaee.one/api/orders/telegram-draft").strip()
 
-    def _send():
+    def _execute():
         target_cids = TELEGRAM_CHAT_IDS if TELEGRAM_CHAT_IDS else ([TELEGRAM_CHAT_ID] if TELEGRAM_CHAT_ID else [])
         if not target_cids:
-            return
+            msg = "ไม่พบ TELEGRAM_CHAT_ID ในการตั้งค่า"
+            print(f"[!] {msg}")
+            return {"success": False, "error": msg, "draft_id": None}
 
         success = False
+        last_draft_id = None
+        last_error = ""
+
         for cid in target_cids:
             payload = {
                 "comment": comment_text,
@@ -229,22 +240,33 @@ def send_pos_draft_order(customer_name: str, comment_text: str, post_url: str = 
                     pos_api_url,
                     json=payload,
                     headers={"Content-Type": "application/json", "User-Agent": "TakoabMonitor/1.0"},
-                    timeout=15
+                    timeout=20
                 )
                 if resp.status_code == 200:
                     res_data = resp.json()
-                    print(f"   🤖 ส่งร่างออเดอร์เข้า Telegram ({cid}) เรียบร้อย (Draft ID: {res_data.get('draft_id')})")
+                    last_draft_id = res_data.get('draft_id')
+                    print(f"   🤖 ส่งร่างออเดอร์เข้า Telegram ({cid}) เรียบร้อย (Draft ID: {last_draft_id})")
                     success = True
                 else:
+                    last_error = f"HTTP {resp.status_code}: {resp.text}"
                     print(f"[!] POS Draft API ตอบกลับสถานะ {resp.status_code}: {resp.text}")
             except Exception as e:
+                last_error = str(e)
                 print(f"[!] เกิดข้อผิดพลาดในการส่งร่างออเดอร์ไปที่ POS ({cid}): {e}")
 
         if not success:
-            print("   ⚠️ ส่งร่างออเดอร์เข้า POS ไม่สำเร็จ กำลัง fallback ส่งการแจ้งเตือนปกติแทน...")
-            send_telegram_alert(customer_name, comment_text, reason=reason, post_url=post_url, sync=True)
+            if not sync:
+                print("   ⚠️ ส่งร่างออเดอร์เข้า POS ไม่สำเร็จ กำลัง fallback ส่งการแจ้งเตือนปกติแทน...")
+                send_telegram_alert(customer_name, comment_text, reason=reason, post_url=post_url, sync=True)
+            return {"success": False, "error": last_error or "ส่งร่างออเดอร์ไม่สำเร็จ", "draft_id": None}
 
-    threading.Thread(target=_send, daemon=True).start()
+        return {"success": True, "draft_id": last_draft_id, "error": ""}
+
+    if sync:
+        return _execute()
+    else:
+        threading.Thread(target=_execute, daemon=True).start()
+        return {"success": True, "draft_id": None, "async": True}
 
 
 def notify_unreplied_order(customer_name: str, comment_text: str, reason: str = "", post_url: str = ""):
