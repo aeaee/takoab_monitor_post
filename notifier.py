@@ -201,6 +201,40 @@ def send_telegram_status(status_text: str, sync: bool = False):
     else:
         threading.Thread(target=_send, daemon=True).start()
 
+
+def send_pos_draft_order(customer_name: str, comment_text: str, post_url: str = ""):
+    """
+    ส่งข้อมูลออเดอร์ไปที่ Takoab POS เพื่อสร้างร่างออเดอร์ และส่งข้อความที่ 2 เข้า Telegram
+    พร้อมปุ่มกด [✅ อนุมัติ (ส่งเข้าครัว)] และ [❌ ไม่อนุมัติ (ไปสร้างบิลเอง)]
+    """
+    pos_api_url = os.getenv("POS_DRAFT_API_URL", "https://takoab-api.aeaee.one/api/orders/telegram-draft").strip()
+
+    def _send():
+        payload = {
+            "comment": comment_text,
+            "customer_name": customer_name,
+            "post_url": post_url,
+            "bot_token": TELEGRAM_BOT_TOKEN,
+            "chat_id": TELEGRAM_CHAT_ID
+        }
+        try:
+            resp = requests.post(
+                pos_api_url,
+                json=payload,
+                headers={"Content-Type": "application/json", "User-Agent": "TakoabMonitor/1.0"},
+                timeout=15
+            )
+            if resp.status_code == 200:
+                res_data = resp.json()
+                print(f"   🤖 ส่งร่างออเดอร์เข้า Telegram เรียบร้อย (Draft ID: {res_data.get('draft_id')})")
+            else:
+                print(f"[!] POS Draft API ตอบกลับสถานะ {resp.status_code}: {resp.text}")
+        except Exception as e:
+            print(f"[!] เกิดข้อผิดพลาดในการส่งร่างออเดอร์ไปที่ POS: {e}")
+
+    threading.Thread(target=_send, daemon=True).start()
+
+
 def notify_unreplied_order(customer_name: str, comment_text: str, reason: str = "", post_url: str = ""):
     """ส่งการแจ้งเตือนเมื่อพบออเดอร์ที่ยังไม่มีการตอบรับ"""
     now_str = datetime.now().strftime("%H:%M:%S")
@@ -228,5 +262,8 @@ def notify_unreplied_order(customer_name: str, comment_text: str, reason: str = 
     if NOTIFICATION_STYLE in ["dialog", "both"]:
         show_modal_dialog(customer_name, comment_text, duration=NOTIFICATION_DURATION, post_url=post_url)
 
-    # 4. ส่งข้อความเข้า Telegram (ถ้ามีการตั้งค่าไว้)
+    # 4. ส่งข้อความชุดที่ 1: แจ้งเตือนข้อความดิบของลูกค้าเข้า Telegram
     send_telegram_alert(customer_name, comment_text, reason, post_url=post_url)
+
+    # 5. ส่งข้อความชุดที่ 2: ร่างออเดอร์พร้อมปุ่มกดอนุมัติ/ไม่อนุมัติเข้าครัว
+    send_pos_draft_order(customer_name, comment_text, post_url=post_url)
