@@ -15,9 +15,10 @@ if sys.platform == "win32":
 from config import (
     POST_URL, POST_URLS, CHECK_INTERVAL, GEMINI_API_KEY, USE_AI,
     OPERATING_HOURS, SEND_IDLE_STATUS, is_within_operating_hours,
-    TRIGGER_FILE, get_post_urls, get_check_interval
+    TRIGGER_FILE, get_post_urls, get_check_interval,
+    ENABLE_AUTO_REPLY, AUTO_REPLY_MESSAGE, get_auto_reply_settings
 )
-from fb_scraper import get_browser_context, manual_login, extract_comments_from_page
+from fb_scraper import get_browser_context, manual_login, extract_comments_from_page, reply_to_facebook_comment
 from analyzer import analyze_comments
 from notifier import (
     load_cache, save_cache, notify_unreplied_order, 
@@ -96,6 +97,11 @@ def run_monitor(once: bool = False):
         print("🤖 โหมดการวิเคราะห์: AI (Google Gemini Flash)")
     else:
         print("🔍 โหมดการวิเคราะห์: Rule-based (ตรวจจับคำว่า 'รับออเดอร์' ในเครื่อง)")
+    auto_reply_on, auto_reply_txt = get_auto_reply_settings(reload_env=True)
+    if auto_reply_on:
+        print(f"💬 ตอบกลับอัตโนมัติบน FB: เปิดใช้งาน (ข้อความ: \"{auto_reply_txt}\")")
+    else:
+        print("💬 ตอบกลับอัตโนมัติบน FB: ปิดการใช้งาน")
     print("="*60 + "\n")
 
     notified_cache = load_cache()
@@ -197,6 +203,22 @@ def run_monitor(once: bool = False):
                                     )
                                     notified_cache.add(c_id)
                                     total_new_alerts += 1
+
+                                    # ตอบรับออเดอร์อัตโนมัติบน Facebook (ถ้าเปิดใช้งาน)
+                                    auto_reply_enabled, auto_reply_template = get_auto_reply_settings(reload_env=True)
+                                    if auto_reply_enabled:
+                                        print(f"      💬 กำลังตอบกลับคอมเมนต์ลูกค้า \"{item.get('customer_name')}\" บน Facebook...")
+                                        replied = reply_to_facebook_comment(
+                                            page=page,
+                                            customer_name=item.get("customer_name", ""),
+                                            comment_text=item.get("text", ""),
+                                            reply_message=auto_reply_template
+                                        )
+                                        if replied:
+                                            print(f"      [✓] ตอบกลับคอมเมนต์ลูกค้า \"{item.get('customer_name')}\" บน Facebook เรียบร้อยแล้ว!")
+                                        else:
+                                            print(f"      [!] ไม่สามารถตอบกลับคอมเมนต์ลูกค้า \"{item.get('customer_name')}\" อัตโนมัติได้")
+                                        time.sleep(1.5)
 
                         if p_idx < len(active_urls):
                             time.sleep(2)

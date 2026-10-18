@@ -41,6 +41,14 @@ def signal_url_update():
     except Exception:
         pass
 
+def get_auto_reply_settings(reload_env: bool = False) -> tuple[bool, str]:
+    """โหลดการตั้งค่าตอบกลับคอมเมนต์อัตโนมัติล่าสุดจาก .env"""
+    if reload_env:
+        load_dotenv(BASE_DIR / ".env", encoding="utf-8", override=True)
+    enabled = os.getenv("ENABLE_AUTO_REPLY", "false").strip().lower() == "true"
+    msg = os.getenv("AUTO_REPLY_MESSAGE", "รับออเดอร์เรียบร้อยแล้วค่ะ ขอบคุณมากนะคะ 🙏").strip()
+    return enabled, msg
+
 # ตั้งค่า URL ของโพสต์เริ่มต้น (เพื่อความเข้ากันได้ย้อนหลังกับโมดูลเดิม)
 raw_post_urls = (os.getenv("POST_URLS", "") or os.getenv("POST_URL", "")).strip()
 POST_URLS = [
@@ -59,6 +67,9 @@ CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "180"))
 
 # ช่วงเวลาเปิดร้าน (เช่น 10:00-20:00) ถ้าปล่อยว่างจะตรวจตลอด 24 ชม.
 OPERATING_HOURS = os.getenv("OPERATING_HOURS", "10:00-20:00").strip()
+# การตอบรับออเดอร์อัตโนมัติบน Facebook
+ENABLE_AUTO_REPLY, AUTO_REPLY_MESSAGE = get_auto_reply_settings(reload_env=False)
+
 
 # ส่งข้อความสถานะปกติทุกรอบแบบไร้เสียง (Silent Telegram Message)
 SEND_IDLE_STATUS = os.getenv("SEND_IDLE_STATUS", "true").strip().lower() == "true"

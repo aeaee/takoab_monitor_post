@@ -593,7 +593,75 @@ class TakoabMonitorGUI:
             activebackground=self.c_card,
             activeforeground=self.c_text
         )
-        self.chk_telegram_idle.pack(fill=tk.X, pady=(6, 10))
+        self.chk_telegram_idle.pack(fill=tk.X, pady=(6, 4))
+
+        # Auto-reply on Facebook Section
+        auto_reply_frame = tk.Frame(settings_card, bg=self.c_card)
+        auto_reply_frame.pack(fill=tk.X, pady=(4, 6))
+
+        self.var_auto_reply = tk.BooleanVar(value=False)
+
+        chk_header = tk.Frame(auto_reply_frame, bg=self.c_card)
+        chk_header.pack(fill=tk.X)
+
+        self.chk_auto_reply = tk.Checkbutton(
+            chk_header,
+            text="💬 ตอบกลับคอมเมนต์ลูกค้าบน Facebook อัตโนมัติ (Auto-Reply)",
+            variable=self.var_auto_reply,
+            font=self.font_label_bold,
+            fg="#38bdf8",
+            bg=self.c_card,
+            selectcolor=self.c_input_bg,
+            activebackground=self.c_card,
+            activeforeground="#38bdf8",
+            command=self._update_auto_reply_badge
+        )
+        self.chk_auto_reply.pack(side=tk.LEFT)
+
+        self.lbl_auto_reply_badge = tk.Label(
+            chk_header,
+            text="[ ปิดใช้งาน ]",
+            font=self.font_btn_sub,
+            fg="#94a3b8",
+            bg=self.c_card
+        )
+        self.lbl_auto_reply_badge.pack(side=tk.LEFT, padx=(8, 0))
+
+        row_reply_msg = tk.Frame(auto_reply_frame, bg=self.c_card)
+        row_reply_msg.pack(fill=tk.X, pady=(4, 2))
+
+        lbl_reply_msg = tk.Label(
+            row_reply_msg,
+            text="   ข้อความตอบรับ:",
+            font=self.font_label,
+            fg=self.c_text,
+            bg=self.c_card,
+            width=23,
+            anchor="w"
+        )
+        lbl_reply_msg.pack(side=tk.LEFT)
+
+        self.ent_auto_reply_msg = tk.Entry(
+            row_reply_msg,
+            font=self.font_input,
+            bg=self.c_input_bg,
+            fg="#e2e8f0",
+            insertbackground="white",
+            relief=tk.FLAT
+        )
+        self.ent_auto_reply_msg.insert(0, "รับออเดอร์เรียบร้อยแล้วค่ะ ขอบคุณมากนะคะ 🙏")
+        self.ent_auto_reply_msg.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=3)
+        self._enable_context_menu_and_shortcuts(self.ent_auto_reply_msg)
+
+        lbl_reply_hint = tk.Label(
+            auto_reply_frame,
+            text="   💡 ใส่ {name} ในข้อความเพื่อแทนชื่อลูกค้าอัตโนมัติ (เช่น 'รับออเดอร์คุณ {name} แล้วค่ะ')",
+            font=self.font_btn_sub,
+            fg=self.c_muted,
+            bg=self.c_card,
+            anchor="w"
+        )
+        lbl_reply_hint.pack(anchor="w", pady=(0, 2))
 
         # Save Settings Button & Feedback label
         save_row = tk.Frame(settings_card, bg=self.c_card)
@@ -896,6 +964,13 @@ class TakoabMonitorGUI:
     # -----------------------------------------------------------------
     # Configuration Load / Save (.env)
     # -----------------------------------------------------------------
+    def _update_auto_reply_badge(self):
+        """อัปเดตป้ายสถานะเปิด/ปิดการตอบกลับอัตโนมัติ"""
+        if self.var_auto_reply.get():
+            self.lbl_auto_reply_badge.config(text="[ เปิดใช้งาน ]", fg="#10b981")
+        else:
+            self.lbl_auto_reply_badge.config(text="[ ปิดใช้งาน ]", fg="#94a3b8")
+
     def load_env_settings(self):
         """อ่านค่าจาก .env มาแสดงใน UI"""
         if not ENV_PATH.exists():
@@ -936,6 +1011,14 @@ class TakoabMonitorGUI:
         idle_val = env_dict.get("SEND_IDLE_STATUS", "false").lower() == "true"
         self.var_telegram_idle.set(idle_val)
 
+        # Auto reply on Facebook
+        auto_reply_val = env_dict.get("ENABLE_AUTO_REPLY", "false").lower() == "true"
+        self.var_auto_reply.set(auto_reply_val)
+        reply_msg_val = env_dict.get("AUTO_REPLY_MESSAGE", "รับออเดอร์เรียบร้อยแล้วค่ะ ขอบคุณมากนะคะ 🙏")
+        self.ent_auto_reply_msg.delete(0, tk.END)
+        self.ent_auto_reply_msg.insert(0, reply_msg_val)
+        self._update_auto_reply_badge()
+
     def save_env_settings(self, trigger_reload: bool = True):
         """บันทึกค่ากลับลงไฟล์ .env โดยรักษาคอมเมนต์และโครงสร้างเดิม และส่งสัญญาณให้อัปเดตทันทีหากบอทกำลังรัน"""
         urls_input = self.txt_urls.get("1.0", tk.END).strip()
@@ -947,12 +1030,17 @@ class TakoabMonitorGUI:
         author = self.ent_author.get().strip()
         telegram_idle = "true" if self.var_telegram_idle.get() else "false"
 
+        auto_reply_enabled = "true" if self.var_auto_reply.get() else "false"
+        auto_reply_message = self.ent_auto_reply_msg.get().strip() or "รับออเดอร์เรียบร้อยแล้วค่ะ ขอบคุณมากนะคะ 🙏"
+
         updates = {
             "POST_URL": formatted_urls,
             "CHECK_INTERVAL": interval,
             "OPERATING_HOURS": hours,
             "POST_AUTHOR_NAME": author,
-            "SEND_IDLE_STATUS": telegram_idle
+            "SEND_IDLE_STATUS": telegram_idle,
+            "ENABLE_AUTO_REPLY": auto_reply_enabled,
+            "AUTO_REPLY_MESSAGE": auto_reply_message
         }
 
         try:

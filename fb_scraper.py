@@ -1,3 +1,4 @@
+import re
 import time
 import hashlib
 from playwright.sync_api import sync_playwright, Page, BrowserContext
@@ -361,3 +362,131 @@ def extract_comments_from_page(page: Page, post_url: str = "") -> tuple[str, lis
             comments.append(parent_item)
 
     return post_author, comments
+
+
+def reply_to_facebook_comment(page: Page, customer_name: str, comment_text: str, reply_message: str) -> bool:
+    """
+    ค้นหาคอมเมนต์ของลูกค้าบนหน้าโพสต์ Facebook แล้วคลิกปุ่ม 'ตอบกลับ' และพิมพ์ข้อความตอบรับออเดอร์
+    รองรับตัวแปร {name} สำหรับใส่ชื่อลูกค้าในข้อความตอบกลับอัตโนมัติ
+    """
+    if not reply_message or not reply_message.strip():
+        return False
+
+    formatted_msg = reply_message.strip()
+    if "{name}" in formatted_msg:
+        c_name = customer_name.strip() if customer_name else "ลูกค้า"
+        formatted_msg = formatted_msg.replace("{name}", c_name)
+
+    # ดึงคำสำคัญจากคอมเมนต์เพื่อค้นหาตำแหน่งใน DOM
+    clean_snippet = re.sub(r'[\s\-_\/]', ' ', comment_text).strip()
+    words = [w for w in clean_snippet.split() if len(w) > 1 and not w.isdigit()]
+    snippet = words[0] if words else clean_snippet[:20]
+
+    try:
+        # 1. ค้นหา article ของคอมเมนต์ลูกค้า และกดปุ่ม 'ตอบกลับ'
+        click_res = page.evaluate("""(args) => {
+            const targetAuthor = (args.author || '').toLowerCase().trim();
+            const targetSnippet = (args.snippet || '').toLowerCase().trim();
+
+            const dialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
+            let postRoot = dialogs.find(d => {
+                const label = d.getAttribute('aria-label') || '';
+                if (label.includes('การแจ้งเตือน') || label.includes('Notifications') || label.includes('แชท') || label.includes('Chat')) return false;
+                return d.querySelectorAll('div[role="article"]').length > 0 || d.innerText.includes('ความคิดเห็น');
+            }) || document.querySelector('div[role="main"]') || document.body;
+
+            const allArticles = Array.from(postRoot.querySelectorAll('div[role="article"]'));
+
+            let foundArticle = null;
+            for (const art of allArticles) {
+                const fullText = (art.innerText || '').toLowerCase();
+                const label = (art.getAttribute('aria-label') || '').toLowerCase();
+
+                const matchAuthor = targetAuthor && (fullText.includes(targetAuthor) || label.includes(targetAuthor));
+                const matchSnippet = targetSnippet && fullText.includes(targetSnippet);
+
+                if (matchAuthor && matchSnippet) {
+                    foundArticle = art;
+                    break;
+                }
+            }
+
+            if (!foundArticle && targetSnippet) {
+                foundArticle = allArticles.find(art => (art.innerText || '').toLowerCase().includes(targetSnippet));
+            }
+            if (!foundArticle && targetAuthor) {
+                foundArticle = allArticles.find(art => (art.innerText || '').toLowerCase().includes(targetAuthor));
+            }
+
+            if (!foundArticle) {
+                return { success: false, reason: 'comment_not_found' };
+            }
+
+            // เลื่อนคอมเมนต์ให้อยู่กลางหน้าจอ
+            foundArticle.scrollIntoView({ behavior: 'instant', block: 'center' });
+
+            // หาปุ่ม 'ตอบกลับ' หรือ 'Reply' ในคอมเมนต์นี้
+            const candidateElements = Array.from(foundArticle.querySelectorAll('div[role="button"], span[role="button"], span, div, a'));
+            const replyBtn = candidateElements.find(el => {
+                const txt = (el.innerText || '').trim();
+                const aria = (el.getAttribute('aria-label') || '').trim();
+                const isReplyText = txt === 'ตอบกลับ' || txt === 'Reply';
+                const isReplyAria = aria.startsWith('ตอบกลับ') || aria.startsWith('Reply');
+                return (isReplyText || isReplyAria) && el.children.length === 0;
+            });
+
+            if (!replyBtn) {
+                return { success: false, reason: 'reply_button_not_found' };
+            }
+
+            replyBtn.click();
+            return { success: true };
+        }""", {"author": customer_name, "snippet": snippet})
+
+        if not click_res or not click_res.get("success"):
+            print(f"      [!] ไม่พบคอมเมนต์หรือปุ่มตอบกลับ ({click_res.get('reason') if click_res else 'unknown'})")
+            return False
+
+        # 2. รอช่องป้อนข้อความตอบกลับแสดงขึ้นมา
+        time.sleep(1.0)
+
+        # 3. โฟกัสไปที่ช่องพิมพ์ข้อความ
+        focused = page.evaluate("""() => {
+            const active = document.activeElement;
+            if (active && (active.isContentEditable || active.getAttribute('role') === 'textbox')) {
+                return true;
+            }
+            const textboxes = Array.from(document.querySelectorAll('div[role="textbox"], div[contenteditable="true"]'));
+            for (const tb of textboxes) {
+                const label = (tb.getAttribute('aria-label') || '').toLowerCase();
+                if (label.includes('ตอบกลับ') || label.includes('reply') || label.includes('เขียน')) {
+                    tb.focus();
+                    return true;
+                }
+            }
+            if (textboxes.length > 0) {
+                textboxes[textboxes.length - 1].focus();
+                return true;
+            }
+            return false;
+        }""")
+
+        if not focused:
+            print("      [!] ไม่พบช่องป้อนข้อความตอบกลับบนหน้าจอ")
+            return False
+
+        time.sleep(0.5)
+
+        # 4. พิมพ์ข้อความตอบกลับ
+        page.keyboard.insert_text(formatted_msg)
+        time.sleep(0.8)
+
+        # 5. กดส่งข้อความ (Enter)
+        page.keyboard.press("Enter")
+        time.sleep(2.5)
+
+        return True
+
+    except Exception as e:
+        print(f"      [!] เกิดข้อผิดพลาดขณะตอบกลับคอมเมนต์: {e}")
+        return False
