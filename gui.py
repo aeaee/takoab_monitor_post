@@ -29,8 +29,8 @@ class TakoabMonitorGUI:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("Takoab Post Monitor - ระบบเฝ้าดูคอมเมนต์ออเดอร์")
-        self.root.geometry("1160x800")
-        self.root.minsize(980, 680)
+        self.root.geometry("1180x940")
+        self.root.minsize(980, 750)
         self.root.configure(bg="#0f172a")
 
         # Select the best native Thai font for Windows
@@ -167,9 +167,9 @@ class TakoabMonitorGUI:
             bd=1,
             relief=tk.SOLID,
             padx=12,
-            pady=12
+            pady=8
         )
-        control_card.pack(fill=tk.X, pady=(0, 12))
+        control_card.pack(fill=tk.X, pady=(0, 8))
 
         btn_row = tk.Frame(control_card, bg=self.c_card)
         btn_row.pack(fill=tk.X, pady=(2, 8))
@@ -263,9 +263,9 @@ class TakoabMonitorGUI:
             bd=1,
             relief=tk.SOLID,
             padx=12,
-            pady=10
+            pady=8
         )
-        test_order_card.pack(fill=tk.X, pady=(0, 10))
+        test_order_card.pack(fill=tk.X, pady=(0, 8))
 
         # Customer Name Input Row
         row_test_name = tk.Frame(test_order_card, bg=self.c_card)
@@ -312,7 +312,7 @@ class TakoabMonitorGUI:
 
         self.txt_test_comment = tk.Text(
             row_test_comment,
-            height=3,
+            height=2,
             font=self.font_input,
             bg=self.c_input_bg,
             fg="#f8fafc",
@@ -423,9 +423,9 @@ class TakoabMonitorGUI:
             bd=1,
             relief=tk.SOLID,
             padx=12,
-            pady=12
+            pady=10
         )
-        settings_card.pack(fill=tk.BOTH, expand=True)
+        settings_card.pack(fill=tk.X, pady=(0, 6))
 
         # Post URLs Header & Action Buttons
         url_header = tk.Frame(settings_card, bg=self.c_card)
@@ -503,7 +503,7 @@ class TakoabMonitorGUI:
             spacing3=3,
             undo=True
         )
-        self.txt_urls.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        self.txt_urls.pack(fill=tk.X, expand=False, pady=(0, 6))
 
         # Check Interval
         row_interval = tk.Frame(settings_card, bg=self.c_card)
