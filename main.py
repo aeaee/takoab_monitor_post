@@ -71,17 +71,20 @@ def test_order(customer_name: str = "", comment_text: str = ""):
 
 
 def run_monitor(once: bool = False):
-    """รันระบบเฝ้าดูคอมเมนต์ในโพสต์ (รองรับหลายโพสต์)"""
-    if not POST_URLS:
+    """รันระบบเฝ้าดูคอมเมนต์ในโพสต์ (รองรับหลายโพสต์ และรองรับเปลี่ยน/สลับลิงก์ทันทีแบบ Realtime)"""
+    active_urls = get_post_urls(reload_env=True)
+    if not active_urls:
+        active_urls = POST_URLS
+
+    if not active_urls:
         print("\n[!] ยังไม่ได้ระบุ POST_URL หรือไม่มี URL ที่ถูกต้อง")
-        print("👉 กรุณาเปิดไฟล์ .env แล้วใส่ URL ของโพสต์ที่ต้องการเฝ้าดู เช่น:")
-        print("   POST_URL=https://www.facebook.com/groups/xxxx/posts/yyyy/\n")
+        print("👉 กรุณาเปิดไฟล์ .env หรือระบุลิงก์ในหน้าต่างโปรแกรม (GUI) แล้วบันทึก/อัปเดต\n")
         return
 
     print("\n" + "="*60)
     print("🚀 เริ่มระบบเฝ้าดูคอมเมนต์โพสต์ Facebook")
-    print(f"📌 จำนวนโพสต์ที่เฝ้าดู: {len(POST_URLS)} โพสต์")
-    for idx, p_url in enumerate(POST_URLS, 1):
+    print(f"📌 จำนวนโพสต์ที่เฝ้าดู: {len(active_urls)} โพสต์")
+    for idx, p_url in enumerate(active_urls, 1):
         print(f"   [{idx}] {p_url}")
     print(f"⏱️ รอบการตรวจสอบ: ทุกๆ ~{CHECK_INTERVAL} วินาที")
     if OPERATING_HOURS:
@@ -103,7 +106,7 @@ def run_monitor(once: bool = False):
 
         try:
             # ตรวจสอบเบื้องต้นว่าติดหน้า Login หรือไม่ด้วยโพสต์แรก
-            first_url = POST_URLS[0]
+            first_url = active_urls[0] if active_urls else "https://www.facebook.com"
             print("[*] กำลังเปิดหน้า Facebook เพื่อตรวจสอบสถานะการล็อกอิน...")
             page.goto(first_url, wait_until="domcontentloaded")
             time.sleep(3)
@@ -116,20 +119,53 @@ def run_monitor(once: bool = False):
             round_count = 1
             while True:
                 try:
+                    # ตรวจสอบและเคลียร์ Trigger Flag หากมีค้างอยู่
+                    if TRIGGER_FILE.exists():
+                        try:
+                            TRIGGER_FILE.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+
+                    # โหลดรายการ URL ล่าสุดจาก .env ทุกรอบ
+                    latest_urls = get_post_urls(reload_env=True)
+                    if latest_urls:
+                        if latest_urls != active_urls:
+                            print("\n" + "="*60)
+                            print("🔄 [ตรวจพบลำดับลิงก์โพสต์ใหม่จาก GUI / .env!]")
+                            print(f"📌 อัปเดตจำนวนโพสต์ใหม่: {len(latest_urls)} โพสต์")
+                            for idx, p_url in enumerate(latest_urls, 1):
+                                print(f"   [{idx}] {p_url}")
+                            print("="*60)
+                            active_urls = latest_urls
+                    elif not active_urls:
+                        print("\n[!] ยังไม่มี URL โพสต์ที่ถูกต้อง กำลังรอ URL จากหน้าต่างโปรแกรม...")
+                        time.sleep(3)
+                        continue
+
                     # 1. ตรวจสอบเวลาเปิด-ปิดร้าน
                     if not is_within_operating_hours():
                         now_str = datetime.now().strftime("%H:%M:%S")
                         print(f"🌙 [{now_str}] ขณะนี้อยู่นอกเวลาเปิดร้าน ({OPERATING_HOURS}) พักการตรวจชั่วคราว...")
-                        time.sleep(120)
+                        for _ in range(120):
+                            if TRIGGER_FILE.exists():
+                                break
+                            time.sleep(1)
                         continue
 
                     now_str = datetime.now().strftime("%H:%M:%S")
-                    print(f"\n🔄 [รอบที่ {round_count} - {now_str}] เริ่มตรวจเช็คทั้งหมด {len(POST_URLS)} โพสต์...")
+                    print(f"\n🔄 [รอบที่ {round_count} - {now_str}] เริ่มตรวจเช็คทั้งหมด {len(active_urls)} โพสต์...")
 
                     total_new_alerts = 0
+                    interrupted_during_posts = False
 
-                    for p_idx, post_url in enumerate(POST_URLS, 1):
-                        prefix = f"[โพสต์ที่ {p_idx}/{len(POST_URLS)}]" if len(POST_URLS) > 1 else ""
+                    for p_idx, post_url in enumerate(active_urls, 1):
+                        # ตรวจสอบระหว่างโพสต์ว่ามีคำสั่งสลับลิงก์ด่วนหรือไม่
+                        if TRIGGER_FILE.exists():
+                            print("\n⚡ [ตรวจพบสัญญาณขอสลับลิงก์ทันที] กำลังเปลี่ยนไปยังโพสต์ชุดใหม่...")
+                            interrupted_during_posts = True
+                            break
+
+                        prefix = f"[โพสต์ที่ {p_idx}/{len(active_urls)}]" if len(active_urls) > 1 else ""
                         print(f"\n   📄 {prefix} กำลังตรวจโพสต์: {post_url}")
 
                         try:
@@ -161,8 +197,11 @@ def run_monitor(once: bool = False):
                                     notified_cache.add(c_id)
                                     total_new_alerts += 1
 
-                        if p_idx < len(POST_URLS):
+                        if p_idx < len(active_urls):
                             time.sleep(2)
+
+                    if interrupted_during_posts:
+                        continue
 
                     if total_new_alerts > 0:
                         save_cache(notified_cache)
@@ -171,7 +210,7 @@ def run_monitor(once: bool = False):
                         print(f"\n   ✅ ตรวจสอบครบทุกโพสต์แล้ว: ออเดอร์ทั้งหมดได้รับการตอบรับแล้ว หรือไม่มีออเดอร์ใหม่")
                         if SEND_IDLE_STATUS:
                             short_time = datetime.now().strftime("%H:%M")
-                            post_count_str = f" ({len(POST_URLS)} โพสต์)" if len(POST_URLS) > 1 else ""
+                            post_count_str = f" ({len(active_urls)} โพสต์)" if len(active_urls) > 1 else ""
                             send_telegram_status(f"✅ ตรวจสอบแล้ว ({short_time}): ไม่มีออเดอร์ใหม่{post_count_str}")
 
                     if once:
@@ -179,18 +218,37 @@ def run_monitor(once: bool = False):
                         break
 
                     # สุ่มหน่วงเวลาเล็กน้อยเพื่อความปลอดภัย ป้องกัน Bot Detection
+                    current_interval = get_check_interval(reload_env=True)
                     jitter = random.randint(-5, 10)
-                    sleep_time = max(30, CHECK_INTERVAL + jitter)
-                    print(f"\n   ⏳ รออีก {sleep_time} วินาทีก่อนตรวจเช็ครอบถัดไป... (กด Ctrl+C เพื่อหยุด)")
+                    sleep_time = max(30, current_interval + jitter)
+                    print(f"\n   ⏳ รออีก {sleep_time} วินาทีก่อนตรวจเช็ครอบถัดไป... (แก้ไขลิงก์ใน GUI แล้วกดอัปเดตเพื่อตรวจทันทีได้ตลอดเวลา)")
 
-                    # นับถอยหลังเป็นระยะให้ผู้ใช้เห็นความเคลื่อนไหว
-                    remaining = sleep_time
-                    while remaining > 0:
-                        step = min(30, remaining)
-                        time.sleep(step)
-                        remaining -= step
-                        if remaining > 0 and remaining % 30 == 0:
-                            print(f"      ...จะตรวจรอบถัดไปในอีก {remaining} วินาที...")
+                    # นับถอยหลังเป็นวินาที พร้อมดักจับ Trigger File หรือ URL Change
+                    sleep_start = time.time()
+                    last_printed_sec = -1
+                    while (time.time() - sleep_start) < sleep_time:
+                        if TRIGGER_FILE.exists():
+                            try:
+                                TRIGGER_FILE.unlink(missing_ok=True)
+                            except Exception:
+                                pass
+                            print("\n⚡ [ตรวจพบสัญญาณอัปเดตจาก GUI] ข้ามเวลารอและเริ่มตรวจโพสต์ใหม่ทันที!")
+                            break
+
+                        elapsed = int(time.time() - sleep_start)
+                        # เช็ค .env ทุกๆ 3 วินาที เผื่อผู้ใช้บันทึกไฟล์ .env โดยตรง
+                        if elapsed > 0 and elapsed % 3 == 0 and elapsed != last_printed_sec:
+                            chk_urls = get_post_urls(reload_env=True)
+                            if chk_urls and chk_urls != active_urls:
+                                print("\n⚡ [ตรวจพบการเปลี่ยน URL ใน .env] ข้ามเวลารอและเริ่มตรวจโพสต์ใหม่ทันที!")
+                                break
+
+                        remaining = int(sleep_time - elapsed)
+                        if remaining > 0 and remaining % 30 == 0 and remaining != last_printed_sec:
+                            last_printed_sec = remaining
+                            print(f"      ...จะตรวจรอบถัดไปในอีก {remaining} วินาที... (หรือกดอัปเดตใน GUI เพื่อเริ่มทันที)")
+
+                        time.sleep(1)
 
                     round_count += 1
 
@@ -199,7 +257,10 @@ def run_monitor(once: bool = False):
                 except Exception as err:
                     print(f"\n[!] เกิดข้อผิดพลาดในการตรวจสอบรอบนี้: {err}")
                     print("   ⏳ รอ 20 วินาทีก่อนลองรอบถัดไป...")
-                    time.sleep(20)
+                    for _ in range(20):
+                        if TRIGGER_FILE.exists():
+                            break
+                        time.sleep(1)
 
         except KeyboardInterrupt:
             print("\n[!] ผู้ใช้สั่งหยุดการทำงาน (Ctrl+C)")

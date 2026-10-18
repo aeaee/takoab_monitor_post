@@ -21,3 +21,7 @@ notified_cache.json
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# IPC Trigger Flags
+trigger_check.flag
+*.flag

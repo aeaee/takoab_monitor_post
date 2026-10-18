@@ -10,7 +10,38 @@ load_dotenv(BASE_DIR / ".env", encoding="utf-8")
 IS_WINDOWS = platform.system() == "Windows"
 IS_MAC = platform.system() == "Darwin"
 
-# ตั้งค่า URL ของโพสต์ (รองรับหลายโพสต์ โดยคั่นด้วยเครื่องหมายจุลภาค , หรือขึ้นบรรทัดใหม่)
+# สัญญาณ IPC สำหรับแจ้งบอทที่กำลังทำงานอยู่ให้อัปเดตลิงก์ทันที
+TRIGGER_FILE = BASE_DIR / "trigger_check.flag"
+
+def get_post_urls(reload_env: bool = True) -> list:
+    """โหลดรายการ POST_URLS ปัจจุบันจาก .env ใหม่แบบ Realtime"""
+    if reload_env:
+        load_dotenv(BASE_DIR / ".env", encoding="utf-8", override=True)
+    raw_post_urls = (os.getenv("POST_URLS", "") or os.getenv("POST_URL", "")).strip()
+    urls = [
+        u.strip().strip('"').strip("'") for u in raw_post_urls.replace("\n", ",").split(",") 
+        if u.strip() and ("facebook.com" in u or "fb.com" in u or "fb.watch" in u)
+    ]
+    return urls
+
+def get_check_interval(reload_env: bool = False) -> int:
+    """โหลดระยะเวลา CHECK_INTERVAL ล่าสุดจาก .env"""
+    if reload_env:
+        load_dotenv(BASE_DIR / ".env", encoding="utf-8", override=True)
+    try:
+        return int(os.getenv("CHECK_INTERVAL", "180"))
+    except ValueError:
+        return 180
+
+def signal_url_update():
+    """ส่งสัญญาณ IPC ให้บอทที่กำลังรันอยู่สลับลิงก์และเริ่มตรวจทันที"""
+    try:
+        import time
+        TRIGGER_FILE.write_text(f"reload:{time.time()}", encoding="utf-8")
+    except Exception:
+        pass
+
+# ตั้งค่า URL ของโพสต์เริ่มต้น (เพื่อความเข้ากันได้ย้อนหลังกับโมดูลเดิม)
 raw_post_urls = (os.getenv("POST_URLS", "") or os.getenv("POST_URL", "")).strip()
 POST_URLS = [
     u.strip().strip('"').strip("'") for u in raw_post_urls.replace("\n", ",").split(",") 

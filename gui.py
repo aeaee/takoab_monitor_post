@@ -473,6 +473,22 @@ class TakoabMonitorGUI:
         )
         btn_paste_url.pack(side=tk.RIGHT, padx=(0, 6))
 
+        self.btn_quick_apply = tk.Button(
+            url_header,
+            text="⚡ อัปเดตลิงก์ทันที",
+            font=self.font_btn_sub,
+            fg="white",
+            bg="#059669",
+            activebackground="#047857",
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=10,
+            pady=2,
+            command=self.quick_update_urls
+        )
+        self.btn_quick_apply.pack(side=tk.RIGHT, padx=(0, 6))
+
         self.txt_urls = scrolledtext.ScrolledText(
             settings_card,
             height=4,
@@ -597,6 +613,21 @@ class TakoabMonitorGUI:
             command=self.save_env_settings
         )
         self.btn_save.pack(side=tk.LEFT)
+
+        self.btn_save_and_check = tk.Button(
+            save_row,
+            text="⚡ อัปเดตลิงก์ & เริ่มตรวจทันที",
+            font=self.font_btn_main,
+            fg="white",
+            bg="#059669",
+            activebackground="#047857",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=14,
+            pady=7,
+            command=self.quick_update_urls
+        )
+        self.btn_save_and_check.pack(side=tk.LEFT, padx=(8, 0))
 
         self.lbl_save_status = tk.Label(
             save_row,
@@ -905,8 +936,8 @@ class TakoabMonitorGUI:
         idle_val = env_dict.get("SEND_IDLE_STATUS", "false").lower() == "true"
         self.var_telegram_idle.set(idle_val)
 
-    def save_env_settings(self):
-        """บันทึกค่ากลับลงไฟล์ .env โดยรักษาคอมเมนต์และโครงสร้างเดิม"""
+    def save_env_settings(self, trigger_reload: bool = True):
+        """บันทึกค่ากลับลงไฟล์ .env โดยรักษาคอมเมนต์และโครงสร้างเดิม และส่งสัญญาณให้อัปเดตทันทีหากบอทกำลังรัน"""
         urls_input = self.txt_urls.get("1.0", tk.END).strip()
         url_list = [u.strip().strip('"').strip("'") for u in urls_input.replace("\n", ",").split(",") if u.strip()]
         formatted_urls = ", ".join(url_list)
@@ -957,13 +988,37 @@ class TakoabMonitorGUI:
             with open(ENV_PATH, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
 
-            self.lbl_save_status.config(text="✓ บันทึกสำเร็จ!", fg="#10b981")
-            self.root.after(3000, lambda: self.lbl_save_status.config(text=""))
-            self.log_message(f"[*] บันทึกการตั้งค่าลง .env เรียบร้อยแล้ว (จำนวนโพสต์: {len(url_list)})\n")
+            # หากบอทกำลังทำงานอยู่ และ trigger_reload เป็น True ให้ส่งสัญญาณ IPC ให้บอทสลับไปตรวจโพสต์ใหม่ทันที
+            if self.is_running and trigger_reload:
+                try:
+                    trigger_file = BASE_DIR / "trigger_check.flag"
+                    trigger_file.write_text("reload", encoding="utf-8")
+                except Exception:
+                    pass
+                self.lbl_save_status.config(text="⚡ อัปเดตลิงก์แล้ว! บอทกำลังตรวจโพสต์ใหม่", fg="#10b981")
+                self.log_message(f"[*] บันทึกการตั้งค่าแล้ว และส่งสัญญาณให้บอทเริ่มตรวจลิงก์ใหม่ทันที (ไม่ต้องเริ่มโปรแกรมใหม่)\n")
+            else:
+                self.lbl_save_status.config(text="✓ บันทึกสำเร็จ!", fg="#10b981")
+                self.log_message(f"[*] บันทึกการตั้งค่าลง .env เรียบร้อยแล้ว (จำนวนโพสต์: {len(url_list)})\n")
+
+            self.root.after(4000, lambda: self.lbl_save_status.config(text=""))
 
         except Exception as e:
             messagebox.showerror("บันทึกไม่สำเร็จ", f"เกิดข้อผิดพลาด: {e}")
             self.log_message(f"[!] บันทึก .env ล้มเหลว: {e}\n")
+
+    def quick_update_urls(self):
+        """บันทึกการตั้งค่าและสั่งให้บอทสลับลิงก์เริ่มตรวจโพสต์ใหม่ทันทีแบบ Realtime โดยไม่ต้องรีสตาร์ท"""
+        urls_input = self.txt_urls.get("1.0", tk.END).strip()
+        if not urls_input:
+            messagebox.showwarning("ยังไม่ได้ระบุลิงก์", "กรุณาระบุลิงก์โพสต์ Facebook ก่อนกดอัปเดตครับ")
+            return
+
+        self.save_env_settings(trigger_reload=True)
+        if self.is_running:
+            self.log_message("\n⚡ [คำสั่งด่วน] ส่งสัญญาณสลับลิงก์โพสต์สำเร็จ! ระบบจะเริ่มตรวจโพสต์ใหม่นี้ทันทีโดยไม่ต้องเริ่มโปรแกรมใหม่\n")
+        else:
+            self.lbl_save_status.config(text="✓ บันทึกลิงก์แล้ว (พร้อมเริ่มทำงาน)", fg="#10b981")
 
     # -----------------------------------------------------------------
     # Service Lifecycle Management
