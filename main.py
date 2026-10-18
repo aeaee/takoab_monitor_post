@@ -14,7 +14,8 @@ if sys.platform == "win32":
 
 from config import (
     POST_URL, POST_URLS, CHECK_INTERVAL, GEMINI_API_KEY, USE_AI,
-    OPERATING_HOURS, SEND_IDLE_STATUS, is_within_operating_hours
+    OPERATING_HOURS, SEND_IDLE_STATUS, is_within_operating_hours,
+    TRIGGER_FILE, get_post_urls, get_check_interval
 )
 from fb_scraper import get_browser_context, manual_login, extract_comments_from_page
 from analyzer import analyze_comments
