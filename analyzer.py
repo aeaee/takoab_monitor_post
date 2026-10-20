@@ -361,7 +361,13 @@ def analyze_with_rules(comments: list, post_author: str = "") -> list:
                     "post_url": c.get("post_url", "")
                 })
             else:
-                is_order = any(k in text_lower for k in ORDER_KEYWORDS) or ("[📷 มีแนบรูปภาพ]" in text and "[สติกเกอร์]" not in text)
+                is_order = (
+                    any(k in text_lower for k in ORDER_KEYWORDS) or
+                    any(f in text_lower for f in FOOD_ITEMS) or
+                    bool(re.search(r"\b\d+/\d+", text)) or
+                    bool(re.search(r"(?:ซอย|ซ\.|หมู่|ม\.|ห้อง|ตึก|ชั้น|บ้านเลขที่)\s*\d+", text)) or
+                    ("[📷 มีแนบรูปภาพ]" in text and "[สติกเกอร์]" not in text)
+                )
                 if is_order:
                     unreplied.append({
                         "id": c_id,
