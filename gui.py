@@ -6,7 +6,7 @@ import threading
 import subprocess
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+from tkinter import ttk, messagebox, scrolledtext, filedialog
 
 # Enable High-DPI awareness on Windows so text renders razor-sharp
 if sys.platform == "win32":
@@ -38,6 +38,7 @@ class TakoabMonitorGUI:
 
         # Process management
         self.process = None
+        self.group_id = "1111870942162462"
         self.log_queue = queue.Queue()
         self.is_running = False
 
@@ -252,6 +253,26 @@ class TakoabMonitorGUI:
             command=self.clear_cache
         )
         self.btn_clear_cache.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(4, 0))
+
+        # Create Facebook Post Action
+        post_btn_row = tk.Frame(control_card, bg=self.c_card)
+        post_btn_row.pack(fill=tk.X, pady=(6, 2))
+
+        self.btn_create_post = tk.Button(
+            post_btn_row,
+            text="📢 สร้างโพสต์เปิดร้านใหม่ลงกลุ่ม Facebook (Auto Post)",
+            font=self.font_btn_main,
+            fg="white",
+            bg="#0d9488",
+            activebackground="#0f766e",
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=14,
+            pady=7,
+            command=self.open_create_post_dialog
+        )
+        self.btn_create_post.pack(fill=tk.X, expand=True)
 
         # 2. Test Order into Telegram Card
         test_order_card = tk.LabelFrame(
@@ -488,6 +509,22 @@ class TakoabMonitorGUI:
             command=self.quick_update_urls
         )
         self.btn_quick_apply.pack(side=tk.RIGHT, padx=(0, 6))
+
+        btn_post_quick = tk.Button(
+            url_header,
+            text="📢 สร้างโพสต์",
+            font=self.font_btn_sub,
+            fg="white",
+            bg="#0d9488",
+            activebackground="#0f766e",
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=2,
+            command=self.open_create_post_dialog
+        )
+        btn_post_quick.pack(side=tk.RIGHT, padx=(0, 6))
 
         self.txt_urls = scrolledtext.ScrolledText(
             settings_card,
@@ -988,6 +1025,7 @@ class TakoabMonitorGUI:
             self.log_message(f"[!] เกิดข้อผิดพลาดในการอ่าน .env: {e}\n")
             return
 
+        self.group_id = env_dict.get("GROUP_ID", "1111870942162462")
         # URLs
         raw_urls = env_dict.get("POST_URLS", "") or env_dict.get("POST_URL", "")
         clean_urls = [u.strip().strip('"').strip("'") for u in raw_urls.replace("\n", ",").split(",") if u.strip()]
@@ -1352,6 +1390,748 @@ class TakoabMonitorGUI:
                 self.root.destroy()
         else:
             self.root.destroy()
+
+# -----------------------------------------------------------------
+    # Create Facebook Group Post Dialog
+    # -----------------------------------------------------------------
+    def open_create_post_dialog(self):
+        """เปิดหน้าต่างสร้างและเผยแพร่โพสต์เปิดร้านลงกลุ่ม Facebook"""
+        if self.is_running:
+            if not messagebox.askyesno(
+                "ระบบกำลังทำงานอยู่",
+                "ระบบเฝ้าดูคอมเมนต์กำลังทำงานอยู่ (ซึ่งกำลังใช้เบราว์เซอร์ Facebook)\n\n"
+                "จำเป็นต้องหยุดเซอร์วิสชั่วคราวเพื่อเปิดหน้าต่างสร้างโพสต์\n"
+                "ต้องการหยุดเซอร์วิสชั่วคราวและดำเนินการต่อหรือไม่?"
+            ):
+                return
+            self.stop_service()
+
+        CreatePostDialog(self)
+
+
+class PostPreviewWindow:
+    """หน้าต่างแสดงภาพตัวอย่างโพสต์ Facebook ก่อนส่งจริง"""
+    def __init__(self, parent_window, image_path: str):
+        self.win = tk.Toplevel(parent_window)
+        self.win.title("👁 ภาพตัวอย่างโพสต์ Facebook")
+        self.win.geometry("780x620")
+        self.win.minsize(680, 500)
+        self.win.configure(bg="#0f172a")
+
+        header = tk.Frame(self.win, bg="#0f172a")
+        header.pack(fill=tk.X, padx=16, pady=(12, 8))
+
+        lbl = tk.Label(
+            header,
+            text="👁 ภาพตัวอย่างหน้าต่างโพสต์ Facebook (จำลองการกรอกข้อมูลจริง)",
+            font=("Leelawadee UI", 12, "bold"),
+            fg="#f8fafc",
+            bg="#0f172a"
+        )
+        lbl.pack(side=tk.LEFT)
+
+        # Scrollable canvas for the image
+        container = tk.Frame(self.win, bg="#090d16")
+        container.pack(fill=tk.BOTH, expand=True, padx=16, pady=4)
+
+        try:
+            self.raw_photo = tk.PhotoImage(file=image_path)
+            # Scale down 2x for comfortable display
+            if self.raw_photo.width() > 750:
+                self.disp_photo = self.raw_photo.subsample(2, 2)
+            else:
+                self.disp_photo = self.raw_photo
+
+            img_label = tk.Label(container, image=self.disp_photo, bg="#090d16")
+            img_label.pack(fill=tk.BOTH, expand=True)
+        except Exception as e:
+            lbl_err = tk.Label(
+                container,
+                text=f"ไม่สามารถโหลดภาพตัวอย่างได้: {e}\n(ไฟล์ถูกบันทึกไว้ที่: {image_path})",
+                font=("Leelawadee UI", 10),
+                fg="#ef4444",
+                bg="#090d16",
+                pady=40
+            )
+            lbl_err.pack()
+
+        btn_row = tk.Frame(self.win, bg="#0f172a")
+        btn_row.pack(fill=tk.X, padx=16, pady=12)
+
+        btn_close = tk.Button(
+            btn_row,
+            text="ปิดหน้าต่างตัวอย่าง",
+            font=("Leelawadee UI", 10, "bold"),
+            fg="white",
+            bg="#334155",
+            activebackground="#475569",
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=16,
+            pady=6,
+            command=self.win.destroy
+        )
+        btn_close.pack(side=tk.RIGHT)
+
+
+class CreatePostDialog:
+    """หน้าต่างสร้างและเผยแพร่โพสต์เปิดร้านลงกลุ่ม Facebook พร้อมใส่อีโมจิและแนบรูปภาพ"""
+    def __init__(self, parent: TakoabMonitorGUI):
+        self.parent = parent
+        self.root = parent.root
+
+        from fb_poster import (
+            get_thai_date_string, get_default_template, save_template,
+            format_post_text, get_default_post_images, publish_facebook_group_post,
+            update_env_post_url
+        )
+        from datetime import datetime, timedelta
+
+        self.get_thai_date_string = get_thai_date_string
+        self.get_default_template = get_default_template
+        self.save_template = save_template
+        self.format_post_text = format_post_text
+        self.get_default_post_images = get_default_post_images
+        self.publish_facebook_group_post = publish_facebook_group_post
+        self.update_env_post_url = update_env_post_url
+        self.datetime = datetime
+        self.timedelta = timedelta
+
+        self.attached_images = self.get_default_post_images()
+        self.is_processing = False
+
+        self.win = tk.Toplevel(self.root)
+        self.win.title("📢 สร้างและเผยแพร่โพสต์เปิดร้านลงกลุ่ม Facebook")
+        self.win.geometry("920x840")
+        self.win.minsize(820, 700)
+        self.win.configure(bg=self.parent.c_bg)
+        self.win.transient(self.root)
+        self.win.grab_set()
+
+        # Center on parent window
+        try:
+            x = self.root.winfo_x() + max(0, (self.root.winfo_width() - 920) // 2)
+            y = self.root.winfo_y() + max(0, (self.root.winfo_height() - 840) // 2)
+            self.win.geometry(f"+{x}+{y}")
+        except Exception:
+            pass
+
+        self._build_ui()
+
+    def _build_ui(self):
+        c_bg = self.parent.c_bg
+        c_card = self.parent.c_card
+        c_text = self.parent.c_text
+        c_muted = self.parent.c_muted
+        c_input_bg = self.parent.c_input_bg
+        font_main = self.parent.font_family
+
+        main_box = tk.Frame(self.win, bg=c_bg)
+        main_box.pack(fill=tk.BOTH, expand=True, padx=16, pady=12)
+
+        # Header
+        hdr = tk.Frame(main_box, bg=c_bg)
+        hdr.pack(fill=tk.X, pady=(0, 10))
+
+        tk.Label(
+            hdr,
+            text="📢 สร้างโพสต์เปิดร้านลงกลุ่ม Facebook",
+            font=(font_main, 14, "bold"),
+            fg=c_text,
+            bg=c_bg
+        ).pack(side=tk.LEFT)
+
+        tk.Label(
+            hdr,
+            text="พิมพ์ข้อความพร้อมอีโมจิครบถ้วน แนบรูปภาพ และอัปเดตลิงก์เฝ้าดูอัตโนมัติ",
+            font=(font_main, 10),
+            fg=c_muted,
+            bg=c_bg
+        ).pack(side=tk.LEFT, padx=(12, 0), pady=(3, 0))
+
+        # Top Control Card (Group + Date)
+        top_card = tk.LabelFrame(
+            main_box,
+            text=" ⚙️ ข้อมูลกลุ่มและวันที่ ",
+            font=self.parent.font_card_title,
+            fg=c_text,
+            bg=c_card,
+            bd=1,
+            relief=tk.SOLID,
+            padx=12,
+            pady=8
+        )
+        top_card.pack(fill=tk.X, pady=(0, 8))
+
+        # Row 1: Target Group
+        row_grp = tk.Frame(top_card, bg=c_card)
+        row_grp.pack(fill=tk.X, pady=(0, 6))
+
+        tk.Label(
+            row_grp,
+            text="👥 กลุ่มเป้าหมาย (ID หรือ URL):",
+            font=self.parent.font_label_bold,
+            fg=c_text,
+            bg=c_card,
+            width=24,
+            anchor="w"
+        ).pack(side=tk.LEFT)
+
+        self.ent_group = tk.Entry(
+            row_grp,
+            font=self.parent.font_input,
+            bg=c_input_bg,
+            fg="#f8fafc",
+            insertbackground="white",
+            relief=tk.FLAT,
+            bd=1
+        )
+        default_grp = self.parent.group_id or "1111870942162462"
+        self.ent_group.insert(0, default_grp)
+        self.ent_group.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.parent._enable_context_menu_and_shortcuts(self.ent_group)
+
+        # Row 2: Post Date
+        row_dt = tk.Frame(top_card, bg=c_card)
+        row_dt.pack(fill=tk.X, pady=(2, 0))
+
+        tk.Label(
+            row_dt,
+            text="📅 วันที่เปิดรับออเดอร์:",
+            font=self.parent.font_label_bold,
+            fg=c_text,
+            bg=c_card,
+            width=24,
+            anchor="w"
+        ).pack(side=tk.LEFT)
+
+        today_thai = self.get_thai_date_string()
+        self.ent_date = tk.Entry(
+            row_dt,
+            font=self.parent.font_input,
+            bg=c_input_bg,
+            fg="#f8fafc",
+            insertbackground="white",
+            relief=tk.FLAT,
+            bd=1,
+            width=18
+        )
+        self.ent_date.insert(0, today_thai)
+        self.ent_date.pack(side=tk.LEFT)
+        self.parent._enable_context_menu_and_shortcuts(self.ent_date)
+
+        # Date helper buttons
+        btn_today = tk.Button(
+            row_dt,
+            text="📅 วันนี้",
+            font=self.parent.font_btn_sub,
+            fg=c_text,
+            bg=self.parent.c_btn,
+            activebackground=self.parent.c_btn_hover,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=1,
+            command=self._set_date_today
+        )
+        btn_today.pack(side=tk.LEFT, padx=(8, 4))
+
+        btn_tmrw = tk.Button(
+            row_dt,
+            text="📅 พรุ่งนี้",
+            font=self.parent.font_btn_sub,
+            fg=c_text,
+            bg=self.parent.c_btn,
+            activebackground=self.parent.c_btn_hover,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=1,
+            command=self._set_date_tomorrow
+        )
+        btn_tmrw.pack(side=tk.LEFT, padx=4)
+
+        btn_apply_date = tk.Button(
+            row_dt,
+            text="↻ อัปเดตวันที่ในข้อความ",
+            font=self.parent.font_btn_sub,
+            fg="white",
+            bg="#0284c7",
+            activebackground="#0369a1",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=1,
+            command=self._apply_date_to_text
+        )
+        btn_apply_date.pack(side=tk.LEFT, padx=4)
+
+        # Emoji Toolbar Card
+        emoji_bar = tk.Frame(main_box, bg=c_card, bd=1, relief=tk.SOLID, padx=8, pady=4)
+        emoji_bar.pack(fill=tk.X, pady=(0, 6))
+
+        tk.Label(
+            emoji_bar,
+            text="🎨 แทรกอีโมจิ:",
+            font=self.parent.font_label_bold,
+            fg="#38bdf8",
+            bg=c_card
+        ).pack(side=tk.LEFT, padx=(0, 6))
+
+        emojis = [
+            "🐙", "💸", "👉", "💥", "📌", "🍛", "🍳", "🍗",
+            "🍿", "🍟", "🥤", "❌", "🌶", "🧀", "🧅", "🍢",
+            "🍯", "🧄", "🏚️", "🛵", "✨"
+        ]
+        for em in emojis:
+            b = tk.Button(
+                emoji_bar,
+                text=em,
+                font=(font_main, 11),
+                fg="white",
+                bg=c_input_bg,
+                activebackground=self.parent.c_btn_hover,
+                relief=tk.FLAT,
+                cursor="hand2",
+                padx=5,
+                pady=1,
+                command=lambda c=em: self._insert_emoji(c)
+            )
+            b.pack(side=tk.LEFT, padx=1)
+
+        # Post Content Text Card
+        text_card = tk.LabelFrame(
+            main_box,
+            text=" 📝 ข้อความโพสต์ (แก้ไขรายละเอียด ราคา หรือเมนูได้อิสระ) ",
+            font=self.parent.font_card_title,
+            fg=c_text,
+            bg=c_card,
+            bd=1,
+            relief=tk.SOLID,
+            padx=10,
+            pady=8
+        )
+        text_card.pack(fill=tk.BOTH, expand=True, pady=(0, 6))
+
+        txt_hdr = tk.Frame(text_card, bg=c_card)
+        txt_hdr.pack(fill=tk.X, pady=(0, 4))
+
+        tk.Label(
+            txt_hdr,
+            text="💡 ระบบจะพิมพ์ข้อความพร้อมอีโมจิลงกล่องโพสต์ของ Facebook 100%",
+            font=self.parent.font_btn_sub,
+            fg=c_muted,
+            bg=c_card
+        ).pack(side=tk.LEFT)
+
+        btn_save_tmpl = tk.Button(
+            txt_hdr,
+            text="💾 บันทึกเป็นเทมเพลตต้นแบบ",
+            font=self.parent.font_btn_sub,
+            fg="white",
+            bg=self.parent.c_accent,
+            activebackground=self.parent.c_accent_hover,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=1,
+            command=self._save_as_template
+        )
+        btn_save_tmpl.pack(side=tk.RIGHT)
+
+        btn_reset_tmpl = tk.Button(
+            txt_hdr,
+            text="↻ โหลดเทมเพลตต้นแบบ",
+            font=self.parent.font_btn_sub,
+            fg=c_muted,
+            bg=self.parent.c_btn,
+            activebackground=self.parent.c_btn_hover,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=1,
+            command=self._reload_template
+        )
+        btn_reset_tmpl.pack(side=tk.RIGHT, padx=(0, 6))
+
+        self.txt_content = scrolledtext.ScrolledText(
+            text_card,
+            wrap=tk.WORD,
+            font=self.parent.font_input,
+            bg=c_input_bg,
+            fg="#f8fafc",
+            insertbackground="white",
+            relief=tk.FLAT,
+            bd=1,
+            spacing1=3,
+            spacing2=3,
+            spacing3=3,
+            undo=True
+        )
+        self.txt_content.pack(fill=tk.BOTH, expand=True)
+        self.parent._enable_context_menu_and_shortcuts(self.txt_content)
+
+        # Load initial content
+        initial_text = self.format_post_text(self.get_default_template(), custom_date_str=today_thai)
+        self.txt_content.insert("1.0", initial_text)
+
+        # Image Attachments Card
+        img_card = tk.Frame(main_box, bg=c_card, bd=1, relief=tk.SOLID, padx=10, pady=6)
+        img_card.pack(fill=tk.X, pady=(0, 6))
+
+        self.lbl_img_info = tk.Label(
+            img_card,
+            text="",
+            font=self.parent.font_label_bold,
+            fg=c_text,
+            bg=c_card,
+            anchor="w"
+        )
+        self.lbl_img_info.pack(side=tk.LEFT)
+        self._update_images_label()
+
+        btn_clear_imgs = tk.Button(
+            img_card,
+            text="🗑 ล้างรูป",
+            font=self.parent.font_btn_sub,
+            fg=c_muted,
+            bg=self.parent.c_btn,
+            activebackground=self.parent.c_btn_hover,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=2,
+            command=self._clear_images
+        )
+        btn_clear_imgs.pack(side=tk.RIGHT)
+
+        btn_open_folder = tk.Button(
+            img_card,
+            text="📂 โฟลเดอร์รูป",
+            font=self.parent.font_btn_sub,
+            fg=c_text,
+            bg=self.parent.c_btn,
+            activebackground=self.parent.c_btn_hover,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=2,
+            command=self._open_assets_folder
+        )
+        btn_open_folder.pack(side=tk.RIGHT, padx=(0, 6))
+
+        btn_add_img = tk.Button(
+            img_card,
+            text="➕ เพิ่มรูป...",
+            font=self.parent.font_btn_sub,
+            fg="white",
+            bg="#0284c7",
+            activebackground="#0369a1",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=8,
+            pady=2,
+            command=self._pick_more_images
+        )
+        btn_add_img.pack(side=tk.RIGHT, padx=(0, 6))
+
+        # Checkboxes row
+        opts_row = tk.Frame(main_box, bg=c_bg)
+        opts_row.pack(fill=tk.X, pady=(2, 6))
+
+        self.var_update_urls = tk.BooleanVar(value=True)
+        chk_url = tk.Checkbutton(
+            opts_row,
+            text="☑ อัปเดตลิงก์ในโปรแกรมและ .env ทันทีหลังโพสต์เสร็จ",
+            variable=self.var_update_urls,
+            font=self.parent.font_label,
+            fg=c_text,
+            bg=c_bg,
+            selectcolor=c_input_bg,
+            activebackground=c_bg,
+            activeforeground=c_text
+        )
+        chk_url.pack(side=tk.LEFT)
+
+        self.var_auto_watch = tk.BooleanVar(value=True)
+        chk_watch = tk.Checkbutton(
+            opts_row,
+            text="☑ เริ่มเฝ้าดูคอมเมนต์ทันทีหลังโพสต์เสร็จ (Auto Watch)",
+            variable=self.var_auto_watch,
+            font=self.parent.font_label,
+            fg="#38bdf8",
+            bg=c_bg,
+            selectcolor=c_input_bg,
+            activebackground=c_bg,
+            activeforeground="#38bdf8"
+        )
+        chk_watch.pack(side=tk.LEFT, padx=(16, 0))
+
+        # Status row
+        self.lbl_status = tk.Label(
+            main_box,
+            text="⚪ สถานะ: พร้อมทำงาน (กดปุ่มด้านล่างเพื่อเริ่ม)",
+            font=self.parent.font_label,
+            fg="#94a3b8",
+            bg=c_bg,
+            anchor="w"
+        )
+        self.lbl_status.pack(fill=tk.X, pady=(0, 6))
+
+        # Bottom Buttons Row
+        action_row = tk.Frame(main_box, bg=c_bg)
+        action_row.pack(fill=tk.X)
+
+        self.btn_publish = tk.Button(
+            action_row,
+            text="🚀 เผยแพร่โพสต์ลง Facebook ทันที",
+            font=self.parent.font_btn_main,
+            fg="white",
+            bg=self.parent.c_start,
+            activebackground=self.parent.c_start_hover,
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=18,
+            pady=8,
+            command=self.start_publish
+        )
+        self.btn_publish.pack(side=tk.LEFT)
+
+        self.btn_preview = tk.Button(
+            action_row,
+            text="👁 ดูภาพตัวอย่างก่อนโพสต์ (Preview)",
+            font=self.parent.font_btn_main,
+            fg="white",
+            bg=self.parent.c_accent,
+            activebackground=self.parent.c_accent_hover,
+            activeforeground="white",
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=16,
+            pady=8,
+            command=self.start_preview
+        )
+        self.btn_preview.pack(side=tk.LEFT, padx=(10, 0))
+
+        btn_close = tk.Button(
+            action_row,
+            text="✕ ปิดหน้าต่าง",
+            font=self.parent.font_btn_sub,
+            fg=c_muted,
+            bg=self.parent.c_btn,
+            activebackground=self.parent.c_btn_hover,
+            relief=tk.FLAT,
+            cursor="hand2",
+            padx=14,
+            pady=8,
+            command=self.win.destroy
+        )
+        btn_close.pack(side=tk.RIGHT)
+
+    def _insert_emoji(self, char: str):
+        try:
+            self.txt_content.insert(tk.INSERT, char)
+            self.txt_content.focus_set()
+        except Exception:
+            pass
+
+    def _set_date_today(self):
+        dt_str = self.get_thai_date_string(self.datetime.now())
+        self.ent_date.delete(0, tk.END)
+        self.ent_date.insert(0, dt_str)
+        self._apply_date_to_text()
+
+    def _set_date_tomorrow(self):
+        tmrw = self.datetime.now() + self.timedelta(days=1)
+        dt_str = self.get_thai_date_string(tmrw)
+        self.ent_date.delete(0, tk.END)
+        self.ent_date.insert(0, dt_str)
+        self._apply_date_to_text()
+
+    def _apply_date_to_text(self):
+        dt_str = self.ent_date.get().strip() or self.get_thai_date_string()
+        current = self.txt_content.get("1.0", tk.END).strip()
+        updated = self.format_post_text(current, custom_date_str=dt_str)
+        self.txt_content.delete("1.0", tk.END)
+        self.txt_content.insert("1.0", updated)
+        self.lbl_status.config(text=f"✓ อัปเดตวันที่ในข้อความเป็น '{dt_str}' เรียบร้อย", fg="#10b981")
+
+    def _save_as_template(self):
+        content = self.txt_content.get("1.0", tk.END).strip()
+        if not content:
+            messagebox.showwarning("คำเตือน", "ไม่มีข้อความสำหรับบันทึก")
+            return
+        dt_str = self.ent_date.get().strip()
+        tmpl_content = content
+        if dt_str and dt_str in tmpl_content:
+            tmpl_content = tmpl_content.replace(dt_str, "{date}")
+        self.save_template(tmpl_content)
+        messagebox.showinfo("บันทึกสำเร็จ", "บันทึกข้อความปัจจุบันเป็นเทมเพลตต้นแบบเรียบร้อยแล้ว!")
+
+    def _reload_template(self):
+        dt_str = self.ent_date.get().strip() or self.get_thai_date_string()
+        tmpl = self.get_default_template()
+        text = self.format_post_text(tmpl, custom_date_str=dt_str)
+        self.txt_content.delete("1.0", tk.END)
+        self.txt_content.insert("1.0", text)
+        self.lbl_status.config(text="✓ รีเซ็ตข้อความจากเทมเพลตต้นแบบเรียบร้อย", fg="#10b981")
+
+    def _update_images_label(self):
+        count = len(self.attached_images)
+        if count == 0:
+            self.lbl_img_info.config(text="🖼️ รูปภาพแนบ: ยังไม่มีการแนบรูปภาพ", fg="#ef4444")
+        else:
+            names = [os.path.basename(p) for p in self.attached_images[:3]]
+            more = f" และอีก {count - 3} รูป" if count > 3 else ""
+            self.lbl_img_info.config(text=f"🖼️ แนบรูปภาพ {count} รูป ({', '.join(names)}{more})", fg="#10b981")
+
+    def _pick_more_images(self):
+        files = filedialog.askopenfilenames(
+            title="เลือกรูปภาพสำหรับแนบโพสต์ Facebook",
+            filetypes=[("Image Files", "*.jpg;*.jpeg;*.png;*.webp;*.bmp")]
+        )
+        if files:
+            for f in files:
+                if f not in self.attached_images:
+                    self.attached_images.append(f)
+            self._update_images_label()
+
+    def _open_assets_folder(self):
+        from fb_poster import ASSETS_DIR
+        ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+        if sys.platform == "win32":
+            os.startfile(str(ASSETS_DIR))
+        else:
+            import subprocess
+            subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(ASSETS_DIR)])
+
+    def _clear_images(self):
+        self.attached_images = []
+        self._update_images_label()
+
+    def _set_ui_busy(self, busy: bool):
+        self.is_processing = busy
+        if busy:
+            self.btn_publish.config(state=tk.DISABLED, bg="#334155", cursor="arrow")
+            self.btn_preview.config(state=tk.DISABLED, bg="#334155", cursor="arrow")
+        else:
+            self.btn_publish.config(state=tk.NORMAL, bg=self.parent.c_start, cursor="hand2")
+            self.btn_preview.config(state=tk.NORMAL, bg=self.parent.c_accent, cursor="hand2")
+
+    def _update_progress(self, msg: str):
+        self.root.after(0, lambda: self.lbl_status.config(text=f"⏳ {msg}", fg="#38bdf8"))
+
+    def start_preview(self):
+        """ดูตัวอย่างโพสต์ Facebook"""
+        if self.is_processing:
+            return
+
+        grp = self.ent_group.get().strip() or "1111870942162462"
+        content = self.txt_content.get("1.0", tk.END).strip()
+        if not content:
+            messagebox.showwarning("คำเตือน", "กรุณาระบุข้อความสำหรับโพสต์")
+            return
+
+        self._set_ui_busy(True)
+        self.lbl_status.config(text="⏳ กำลังเปิดเบราว์เซอร์เพื่อสร้างภาพตัวอย่าง...", fg="#38bdf8")
+
+        def _worker():
+            try:
+                res = self.publish_facebook_group_post(
+                    group_id_or_url=grp,
+                    content=content,
+                    image_paths=self.attached_images,
+                    headless=True,
+                    preview_only=True,
+                    progress_cb=self._update_progress
+                )
+                self.root.after(0, lambda: self._on_preview_done(res))
+            except Exception as e:
+                self.root.after(0, lambda: self._on_preview_done({"success": False, "error": str(e)}))
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_preview_done(self, res: dict):
+        self._set_ui_busy(False)
+        if res.get("success"):
+            img_path = res.get("preview_image")
+            self.lbl_status.config(text="✓ สร้างภาพตัวอย่างสำเร็จเรียบร้อย!", fg="#10b981")
+            PostPreviewWindow(self.win, img_path)
+        else:
+            err = res.get("error", "เกิดข้อผิดพลาด")
+            self.lbl_status.config(text=f"✕ เกิดข้อผิดพลาด: {err}", fg="#ef4444")
+            messagebox.showerror("เกิดข้อผิดพลาด", f"ไม่สามารถสร้างภาพตัวอย่างได้: {err}")
+
+    def start_publish(self):
+        """เผยแพร่โพสต์ลงในกลุ่ม Facebook ทันที"""
+        if self.is_processing:
+            return
+
+        grp = self.ent_group.get().strip() or "1111870942162462"
+        content = self.txt_content.get("1.0", tk.END).strip()
+        if not content:
+            messagebox.showwarning("คำเตือน", "กรุณาระบุข้อความสำหรับโพสต์")
+            return
+
+        if not messagebox.askyesno(
+            "ยืนยันการโพสต์",
+            f"ระบบจะเปิด Facebook และเผยแพร่โพสต์เปิดร้านนี้ลงในกลุ่ม {grp} โดยอัตโนมัติ\n\n"
+            f"จำนวนรูปภาพที่จะแนบ: {len(self.attached_images)} รูป\n\n"
+            "ต้องการยืนยันการเผยแพร่โพสต์ทันทีหรือไม่?"
+        ):
+            return
+
+        self._set_ui_busy(True)
+        self.lbl_status.config(text="⏳ กำลังเชื่อมต่อ Facebook เพื่อโพสต์...", fg="#38bdf8")
+
+        def _worker():
+            try:
+                res = self.publish_facebook_group_post(
+                    group_id_or_url=grp,
+                    content=content,
+                    image_paths=self.attached_images,
+                    headless=True,
+                    preview_only=False,
+                    progress_cb=self._update_progress
+                )
+                self.root.after(0, lambda: self._on_publish_done(res))
+            except Exception as e:
+                self.root.after(0, lambda: self._on_publish_done({"success": False, "error": str(e)}))
+
+        import threading
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_publish_done(self, res: dict):
+        self._set_ui_busy(False)
+        if res.get("success"):
+            new_url = res.get("post_url")
+            self.lbl_status.config(text=f"✓ เผยแพร่โพสต์สำเร็จ! ({new_url})", fg="#10b981")
+
+            # 1. Update URLs in main GUI and .env
+            if self.var_update_urls.get() and new_url and "posts" in new_url:
+                self.parent.txt_urls.delete("1.0", tk.END)
+                self.parent.txt_urls.insert("1.0", new_url)
+                self.parent.quick_update_urls()
+                self.parent.log_message(f"\n[✓] 📢 โพสต์ใหม่ถูกตั้งเป็นโพสต์เฝ้าดูแล้ว: {new_url}\n")
+
+            # 2. Auto-start watch
+            if self.var_auto_watch.get():
+                self.parent.root.after(500, self.parent.start_service)
+
+            messagebox.showinfo(
+                "เผยแพร่โพสต์สำเร็จ!",
+                f"🎉 โพสต์เปิดร้านลงกลุ่ม Facebook สำเร็จเรียบร้อย!\n\n"
+                f"ลิงก์โพสต์:\n{new_url}\n\n"
+                + ("ระบบกำลังเริ่มเฝ้าดูคอมเมนต์ออเดอร์ทันที" if self.var_auto_watch.get() else "")
+            )
+            self.win.destroy()
+        else:
+            err = res.get("error", "เกิดข้อผิดพลาดในการโพสต์")
+            self.lbl_status.config(text=f"✕ เกิดข้อผิดพลาด: {err}", fg="#ef4444")
+            messagebox.showerror("เกิดข้อผิดพลาด", f"ไม่สามารถโพสต์ลงกลุ่ม Facebook ได้:\n{err}")
 
 def main():
     root = tk.Tk()

@@ -25,3 +25,7 @@ Thumbs.db
 # IPC Trigger Flags
 trigger_check.flag
 *.flag
+
+# Temporary images
+preview_post.png
+error_post.png
