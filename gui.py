@@ -41,6 +41,9 @@ class TakoabMonitorGUI:
         self.group_id = "1111870942162462"
         self.log_queue = queue.Queue()
         self.is_running = False
+        self.tg_poll_active = True
+        self.tg_poller_thread = threading.Thread(target=self._telegram_poller_loop, daemon=True)
+        self.tg_poller_thread.start()
 
         # Apply dark theme styling
         self._setup_styles()
@@ -1287,6 +1290,47 @@ class TakoabMonitorGUI:
     # -----------------------------------------------------------------
     # Auxiliary Actions (Login / Test Notify / Clear Cache)
     # -----------------------------------------------------------------
+    def _telegram_poller_loop(self):
+        """วนตรวจสอบคำสั่งสร้างโพสต์เปิดร้านจาก Telegram เบื้องหลัง"""
+        import time
+        time.sleep(3)
+        while getattr(self, "tg_poll_active", True):
+            try:
+                from telegram_bridge import check_pending_post_command, execute_telegram_post_task
+                task = check_pending_post_command()
+                if task:
+                    close_t = task.get("close_time", "20.00")
+                    cmd_type = task.get("command", "publish")
+                    self.log_queue.put(f"\n[Telegram Command] 🤖 ได้รับคำสั่งสั่งสร้างโพสต์จาก Telegram ({cmd_type.upper()} ปิด {close_t} น.)...\n")
+
+                    was_running = self.is_running
+                    if was_running:
+                        self.log_queue.put("[*] กำลังหยุดเซอร์วิสหลักชั่วคราวเพื่อเปิดเบราว์เซอร์สำหรับโพสต์...\n")
+                        self.root.after(0, self.stop_service)
+                        time.sleep(4)
+
+                    def _progress_cb(msg):
+                        self.log_queue.put(f"[*] {msg}\n")
+
+                    res = execute_telegram_post_task(task, progress_cb=_progress_cb)
+
+                    if res.get("success"):
+                        new_url = res.get("post_url")
+                        if new_url and "posts" in new_url:
+                            def _update_ui(p_url=new_url):
+                                self.txt_urls.delete("1.0", tk.END)
+                                self.txt_urls.insert("1.0", p_url)
+                                self.quick_update_urls()
+                                self.log_message(f"\n[✓] 📢 โพสต์ใหม่ถูกตั้งเป็นโพสต์เฝ้าดูแล้ว: {p_url}\n")
+                                self.root.after(1000, self.start_service)
+                            self.root.after(0, _update_ui)
+                    else:
+                        if was_running:
+                            self.root.after(1000, self.start_service)
+            except Exception:
+                pass
+            time.sleep(5)
+
     def open_facebook_login(self):
         """เปิดหน้าต่างล็อกอิน Facebook ในโหมดโต้ตอบ"""
         if self.is_running:
@@ -1654,7 +1698,7 @@ class CreatePostDialog:
 
         btn_apply_date = tk.Button(
             row_dt,
-            text="↻ อัปเดตวันที่ในข้อความ",
+            text="↻ อัปเดตในข้อความ",
             font=self.parent.font_btn_sub,
             fg="white",
             bg="#0284c7",
@@ -1663,9 +1707,53 @@ class CreatePostDialog:
             cursor="hand2",
             padx=8,
             pady=1,
-            command=self._apply_date_to_text
+            command=self._apply_datetime_to_text
         )
         btn_apply_date.pack(side=tk.LEFT, padx=4)
+
+        # Row 3: Close Time
+        row_time = tk.Frame(top_card, bg=c_card)
+        row_time.pack(fill=tk.X, pady=(4, 0))
+
+        tk.Label(
+            row_time,
+            text="⏰ รับออเดอร์ถึง (เวลา):",
+            font=self.parent.font_label_bold,
+            fg=c_text,
+            bg=c_card,
+            width=24,
+            anchor="w"
+        ).pack(side=tk.LEFT)
+
+        self.ent_close_time = tk.Entry(
+            row_time,
+            font=self.parent.font_input,
+            bg=c_input_bg,
+            fg="#f8fafc",
+            insertbackground="white",
+            relief=tk.FLAT,
+            bd=1,
+            width=18
+        )
+        self.ent_close_time.insert(0, "20.00")
+        self.ent_close_time.pack(side=tk.LEFT)
+        self.parent._enable_context_menu_and_shortcuts(self.ent_close_time)
+
+        for t_val in ["20.00", "20.30", "21.00", "21.30", "19.30"]:
+            btn_t = tk.Button(
+                row_time,
+                text=t_val,
+                font=self.parent.font_btn_sub,
+                fg=c_text,
+                bg=self.parent.c_btn,
+                activebackground=self.parent.c_btn_hover,
+                relief=tk.FLAT,
+                cursor="hand2",
+                padx=6,
+                pady=1,
+                command=lambda val=t_val: self._set_close_time(val)
+            )
+            btn_t.pack(side=tk.LEFT, padx=3)
 
         # Emoji Toolbar Card
         emoji_bar = tk.Frame(main_box, bg=c_card, bd=1, relief=tk.SOLID, padx=8, pady=4)
@@ -1773,7 +1861,7 @@ class CreatePostDialog:
         self.parent._enable_context_menu_and_shortcuts(self.txt_content)
 
         # Load initial content
-        initial_text = self.format_post_text(self.get_default_template(), custom_date_str=today_thai)
+        initial_text = self.format_post_text(self.get_default_template(), custom_date_str=today_thai, close_time="20.00")
         self.txt_content.insert("1.0", initial_text)
 
         # Image Attachments Card
@@ -1941,22 +2029,28 @@ class CreatePostDialog:
         dt_str = self.get_thai_date_string(self.datetime.now())
         self.ent_date.delete(0, tk.END)
         self.ent_date.insert(0, dt_str)
-        self._apply_date_to_text()
+        self._apply_datetime_to_text()
 
     def _set_date_tomorrow(self):
         tmrw = self.datetime.now() + self.timedelta(days=1)
         dt_str = self.get_thai_date_string(tmrw)
         self.ent_date.delete(0, tk.END)
         self.ent_date.insert(0, dt_str)
-        self._apply_date_to_text()
+        self._apply_datetime_to_text()
 
-    def _apply_date_to_text(self):
+    def _set_close_time(self, val: str):
+        self.ent_close_time.delete(0, tk.END)
+        self.ent_close_time.insert(0, val)
+        self._apply_datetime_to_text()
+
+    def _apply_datetime_to_text(self):
         dt_str = self.ent_date.get().strip() or self.get_thai_date_string()
+        close_t = self.ent_close_time.get().strip() or "20.00"
         current = self.txt_content.get("1.0", tk.END).strip()
-        updated = self.format_post_text(current, custom_date_str=dt_str)
+        updated = self.format_post_text(current, custom_date_str=dt_str, close_time=close_t)
         self.txt_content.delete("1.0", tk.END)
         self.txt_content.insert("1.0", updated)
-        self.lbl_status.config(text=f"✓ อัปเดตวันที่ในข้อความเป็น '{dt_str}' เรียบร้อย", fg="#10b981")
+        self.lbl_status.config(text=f"✓ อัปเดตวันที่ '{dt_str}' และเวลาปิดรับออเดอร์ถึง '{close_t}' เรียบร้อย", fg="#10b981")
 
     def _save_as_template(self):
         content = self.txt_content.get("1.0", tk.END).strip()
@@ -1964,16 +2058,20 @@ class CreatePostDialog:
             messagebox.showwarning("คำเตือน", "ไม่มีข้อความสำหรับบันทึก")
             return
         dt_str = self.ent_date.get().strip()
+        close_t = self.ent_close_time.get().strip() or "20.00"
         tmpl_content = content
         if dt_str and dt_str in tmpl_content:
             tmpl_content = tmpl_content.replace(dt_str, "{date}")
+        if close_t and f"รับออเดอร์ถึง {close_t}" in tmpl_content:
+            tmpl_content = tmpl_content.replace(f"รับออเดอร์ถึง {close_t}", "รับออเดอร์ถึง {close_time}")
         self.save_template(tmpl_content)
         messagebox.showinfo("บันทึกสำเร็จ", "บันทึกข้อความปัจจุบันเป็นเทมเพลตต้นแบบเรียบร้อยแล้ว!")
 
     def _reload_template(self):
         dt_str = self.ent_date.get().strip() or self.get_thai_date_string()
+        close_t = self.ent_close_time.get().strip() or "20.00"
         tmpl = self.get_default_template()
-        text = self.format_post_text(tmpl, custom_date_str=dt_str)
+        text = self.format_post_text(tmpl, custom_date_str=dt_str, close_time=close_t)
         self.txt_content.delete("1.0", tk.END)
         self.txt_content.insert("1.0", text)
         self.lbl_status.config(text="✓ รีเซ็ตข้อความจากเทมเพลตต้นแบบเรียบร้อย", fg="#10b981")

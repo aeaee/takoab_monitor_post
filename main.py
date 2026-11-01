@@ -368,11 +368,13 @@ def main():
     parser.add_argument("--test-order", action="store_true", help="เธชเนเธเธ—เธ”เธชเธญเธเธญเธญเน€เธ”เธญเธฃเนเน€เธเนเธฒ Telegram เนเธ”เธขเธฃเธฐเธเธธเธเธทเนเธญเนเธฅเธฐเธเธญเธกเน€เธกเธเธ•เน")
     parser.add_argument("--name", type=str, default="", help="เธเธทเนเธญเธฅเธนเธเธเนเธฒเธชเธณเธซเธฃเธฑเธเธเธฒเธฃเธ—เธ”เธชเธญเธ (เนเธเนเธฃเนเธงเธกเธเธฑเธ --test-order)")
     parser.add_argument("--comment", type=str, default="", help="เธเนเธญเธเธงเธฒเธกเธเธญเธกเน€เธกเธเธ•เนเธชเธณเธซเธฃเธฑเธเธเธฒเธฃเธ—เธ”เธชเธญเธ (เนเธเนเธฃเนเธงเธกเธเธฑเธ --test-order)")
-    parser.add_argument("--post", "--create-post", dest="create_post", action="store_true", help="เธชเธฃเนเธฒเธเนเธฅเธฐเน€เธเธขเนเธเธฃเนเนเธเธชเธ•เนเน€เธเธดเธ”เธฃเนเธฒเธเธฅเธเธเธฅเธธเนเธก Facebook เธญเธฑเธ•เนเธเธกเธฑเธ•เธด")
-    parser.add_argument("--post-date", type=str, default="", help="เธฃเธฐเธเธธเธงเธฑเธเธ—เธตเนเธชเธณเธซเธฃเธฑเธเนเธเธชเธ•เน (เน€เธเนเธ 'เธญเธฒเธ—เธดเธ•เธขเน 1/11/69') เธซเธฒเธเนเธกเนเธฃเธฐเธเธธเธเธฐเนเธเนเธงเธฑเธเธเธตเน")
-    parser.add_argument("--post-preview", action="store_true", help="เธชเธฃเนเธฒเธเธ เธฒเธเธ•เธฑเธงเธญเธขเนเธฒเธเนเธเธชเธ•เนเธฅเธเนเธเธฅเน preview_post.png เนเธ”เธขเธขเธฑเธเนเธกเนเธเธ”เน€เธเธขเนเธเธฃเน")
-    parser.add_argument("--post-group", type=str, default="", help="เธฃเธฐเธเธธ Group ID เธซเธฃเธทเธญ URL เธเธฅเธธเนเธก Facebook เธชเธณเธซเธฃเธฑเธเนเธเธชเธ•เน")
-    parser.add_argument("--auto-watch", action="store_true", help="เน€เธฃเธดเนเธกเน€เธเนเธฒเธ”เธนเธเธญเธกเน€เธกเธเธ•เนเธ—เธฑเธเธ—เธตเธซเธฅเธฑเธเธเธฒเธเนเธเธชเธ•เนเน€เธชเธฃเนเธเธชเธดเนเธ")
+    parser.add_argument("--post", "--create-post", dest="create_post", action="store_true", help="สร้างและเผยแพร่โพสต์เปิดร้านลงกลุ่ม Facebook อัตโนมัติ")
+    parser.add_argument("--post-date", type=str, default="", help="ระบุวันที่สำหรับโพสต์ (เช่น 'อาทิตย์ 1/11/69') หากไม่ระบุจะใช้วันนี้")
+    parser.add_argument("--close-time", type=str, default="20.00", help="ระบุเวลารับออเดอร์ถึง (เช่น '20.00' หรือ '20.30') ค่าเริ่มต้นคือ 20.00")
+    parser.add_argument("--post-preview", action="store_true", help="สร้างภาพตัวอย่างโพสต์ลงไฟล์ preview_post.png โดยยังไม่กดเผยแพร่")
+    parser.add_argument("--post-group", type=str, default="", help="ระบุ Group ID หรือ URL กลุ่ม Facebook สำหรับโพสต์")
+    parser.add_argument("--auto-watch", action="store_true", help="เริ่มเฝ้าดูคอมเมนต์ทันทีหลังจากโพสต์เสร็จสิ้น")
+    parser.add_argument("--listen-telegram", action="store_true", help="รันบริการเฝ้ารอรับคำสั่งสร้างโพสต์จาก Telegram เบื้องหลัง")
 
     args = parser.parse_args()
 
@@ -386,6 +388,22 @@ def main():
         setup_telegram()
     elif args.test_order:
         test_order(customer_name=args.name, comment_text=args.comment)
+    elif args.listen_telegram:
+        import time
+        from telegram_bridge import check_pending_post_command, execute_telegram_post_task
+        print("\n" + "=" * 60)
+        print("🤖 เริ่มบริการเฝ้ารอรับคำสั่งสร้างโพสต์จาก Telegram...")
+        print("📱 เมื่อพิมพ์ /post ใน Telegram บอทจะทำการสร้างโพสต์ให้อัตโนมัติ")
+        print("=" * 60 + "\n")
+        while True:
+            try:
+                task = check_pending_post_command()
+                if task:
+                    print(f"\n[*] 🤖 ตรวจพบคำสั่งจาก Telegram: {task.get('command')} (ปิด {task.get('close_time', '20.00')} น.)")
+                    execute_telegram_post_task(task)
+            except Exception as e:
+                print(f"[!] เกิดข้อผิดพลาด: {e}")
+            time.sleep(5)
     elif args.create_post or args.post_preview:
         from fb_poster import (
             get_default_template, format_post_text, get_default_post_images,
@@ -394,7 +412,7 @@ def main():
         from config import GROUP_ID
         group_target = args.post_group.strip() or GROUP_ID or "1111870942162462"
         tmpl = get_default_template()
-        content_txt = format_post_text(tmpl, custom_date_str=args.post_date)
+        content_txt = format_post_text(tmpl, custom_date_str=args.post_date, close_time=args.close_time)
         images = get_default_post_images()
 
         print("\n" + "=" * 60)

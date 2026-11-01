@@ -33,17 +33,29 @@ def save_template(content: str):
     """บันทึกข้อความเทมเพลตโพสต์"""
     TEMPLATE_PATH.write_text(content.strip(), encoding="utf-8")
 
-def format_post_text(template_text: str, custom_date_str: str = None) -> str:
-    """แทนที่ {date} หรือวันที่ในเทมเพลตด้วยวันที่เป้าหมาย"""
+def format_post_text(template_text: str, custom_date_str: str = None, close_time: str = None) -> str:
+    """แทนที่ {date} และ {close_time} ในเทมเพลตด้วยวันที่และเวลาเป้าหมาย"""
     date_str = custom_date_str.strip() if custom_date_str else get_thai_date_string()
+    raw_time = close_time.strip() if close_time else "20.00"
+    clean_time = raw_time.replace(":", ".").replace("น.", "").replace("น", "").strip() or "20.00"
+
     text = template_text
+    # 1. แทนที่วันที่
     if "{date}" in text:
         text = text.replace("{date}", date_str)
     elif "{today}" in text:
         text = text.replace("{today}", date_str)
     else:
-        # หากไม่มีแท็ก ให้ค้นหาบรรทัด 'เปิดรับออเดอร์ ...' แล้วแทนที่
         text = re.sub(r'(🐙เปิดรับออเดอร์\s+)[^\n]*', rf'\g<1>{date_str}', text)
+
+    # 2. แทนที่เวลาปิดรับออเดอร์
+    if "{close_time}" in text:
+        text = text.replace("{close_time}", clean_time)
+    elif "{time}" in text:
+        text = text.replace("{time}", clean_time)
+    else:
+        text = re.sub(r'(รับออเดอร์ถึง\s*)[^\n]*', rf'\g<1>{clean_time}', text)
+
     return text
 
 def get_default_post_images() -> list[str]:
@@ -293,3 +305,4 @@ def publish_facebook_group_post(
                 "post_url": None,
                 "error": err_msg
             }
+
