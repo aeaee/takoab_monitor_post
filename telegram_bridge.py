@@ -96,3 +96,4 @@ def execute_telegram_post_task(task: dict, progress_cb=None) -> dict:
         print(f"[!] 🤖 ดำเนินการคำสั่ง Telegram ไม่สำเร็จ: {err}")
 
     return res
+

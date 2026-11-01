@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import time
 import random
 import argparse
@@ -27,132 +27,152 @@ from notifier import (
 )
 
 def test_notification():
-    """เธ—เธ”เธชเธญเธเธฃเธฐเธเธเนเธเนเธเน€เธ•เธทเธญเธเนเธฅเธฐเน€เธชเธตเธขเธ (เธฃเธญเธเธฃเธฑเธเธ—เธฑเนเธ Windows เนเธฅเธฐ macOS)"""
-    print("[*] เธเธณเธฅเธฑเธเธ—เธ”เธชเธญเธเธชเนเธเธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธเนเธฅเธฐเน€เธฅเนเธเน€เธชเธตเธขเธ...")
+    """ทดสอบระบบแจ้งเตือนและเสียง (รองรับทั้ง Windows และ macOS)"""
+    print("[*] กำลังทดสอบส่งการแจ้งเตือนและเล่นเสียง...")
     play_alert_sound()
     send_system_banner(
-        title="๐จ เธ—เธ”เธชเธญเธเนเธเนเธเน€เธ•เธทเธญเธเธญเธญเน€เธ”เธญเธฃเน",
-        subtitle="เธฃเธฐเธเธ Facebook Group Monitor",
-        message="เธ–เนเธฒเธเธธเธ“เน€เธซเนเธเธเนเธญเธเธญเธฑเธเนเธฅเธฐเนเธ”เนเธขเธดเธเน€เธชเธตเธขเธ เนเธชเธ”เธเธงเนเธฒเธฃเธฐเธเธเนเธเนเธเน€เธ•เธทเธญเธเธเธฃเนเธญเธกเธ—เธณเธเธฒเธ 100%!"
+        title="🚨 ทดสอบแจ้งเตือนออเดอร์",
+        subtitle="ระบบ Facebook Group Monitor",
+        message="ถ้าคุณเห็นป๊อปอัปและได้ยินเสียง แสดงว่าระบบแจ้งเตือนพร้อมทำงาน 100%!"
     )
     show_modal_dialog(
-        customer_name="เธเธธเธ“เธชเธกเธเธฒเธข (เธ—เธ”เธชเธญเธ)",
-        message="เธชเธฑเนเธเธ—เธฒเนเธเธฐเธขเธฒเธเธด 2 เธเธฅเนเธญเธ\n(เธ—เธ”เธชเธญเธเธฃเธฐเธเธเธซเธเนเธฒเธ•เนเธฒเธเนเธเนเธเน€เธ•เธทเธญเธ)",
+        customer_name="คุณสมชาย (ทดสอบ)",
+        message="สั่งทาโกะยากิ 2 กล่อง\n(ทดสอบระบบหน้าต่างแจ้งเตือน)",
         duration=15
     )
-    print("[*] เธเธณเธฅเธฑเธเธชเนเธเนเธเนเธเน€เธ•เธทเธญเธเธญเธญเน€เธ”เธญเธฃเนเธ—เธ”เธชเธญเธเน€เธเนเธฒ Telegram...")
+    print("[*] กำลังส่งแจ้งเตือนออเดอร์ทดสอบเข้า Telegram...")
     send_telegram_alert(
-        customer_name="เธเธธเธ“เธชเธกเธเธฒเธข (เธ—เธ”เธชเธญเธเธฃเธฐเธเธ)",
-        message="เธชเธฑเนเธเธ—เธฒเนเธเธฐเธขเธฒเธเธด 2 เธเธฅเนเธญเธ\n(เธเนเธญเธเธงเธฒเธกเธ—เธ”เธชเธญเธเนเธเนเธเน€เธ•เธทเธญเธเธเธฒเธ Takoab Monitor)",
-        reason="เธ—เธ”เธชเธญเธเธฃเธฐเธเธเธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธ",
+        customer_name="คุณสมชาย (ทดสอบระบบ)",
+        message="สั่งทาโกะยากิ 2 กล่อง\n(ข้อความทดสอบแจ้งเตือนจาก Takoab Monitor)",
+        reason="ทดสอบระบบการแจ้งเตือน",
         sync=True
     )
-    send_telegram_status("๐งช <b>เธ—เธ”เธชเธญเธเธเนเธญเธเธงเธฒเธกเธชเธ–เธฒเธเธฐเธเธเธ•เธด (เนเธเธเนเธฃเนเน€เธชเธตเธขเธ)</b> เธชเธณเน€เธฃเนเธเน€เธฃเธตเธขเธเธฃเนเธญเธข!", sync=True)
-    print("[โ“] เธชเนเธเธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธเธ—เธ”เธชเธญเธเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง!")
+    send_telegram_status("🧪 <b>ทดสอบข้อความสถานะปกติ (แบบไร้เสียง)</b> สำเร็จเรียบร้อย!", sync=True)
+    print("[✓] ส่งการแจ้งเตือนทดสอบเรียบร้อยแล้ว!")
 
 def test_order(customer_name: str = "", comment_text: str = ""):
-    """เธ—เธ”เธชเธญเธเธชเนเธเธญเธญเน€เธ”เธญเธฃเนเน€เธเนเธฒ Telegram เน€เธเธทเนเธญเธ—เธ”เธชเธญเธเธเธฒเธฃเธ—เธณเธเธฒเธเธเธญเธเธเธณเธ–เธฒเธกเนเธ•เนเธ•เธญเธเนเธฅเธฐเธฃเนเธฒเธเธญเธญเน€เธ”เธญเธฃเน"""
-    name = customer_name.strip() or "เธ—เธ”เธชเธญเธ เธฅเธนเธเธเนเธฒ Facebook"
-    comment = comment_text.strip() or "เธกเธฒเธกเนเธฒเนเธเนเธเธฃเธญเธเธเธฅเธธเธเธเธญเธช เนเธกเนเน€เธเนเธ” (เนเธขเธเธชเธฒเธซเธฃเนเธฒเธข) 2 เนเธเนเธเธฃเธญเธเธเธฅเธธเธเธเธญเธชเน€เธเธฒเธซเธฅเธต 1 194/119 เธ.6/2 เนเธเนเนเธ—เธขเธเธฅเธฑเธชเธเนเธฐ"
+    """ทดสอบส่งออเดอร์เข้า Telegram เพื่อทดสอบการทำงานของคำถามโต้ตอบและร่างออเดอร์"""
+    name = customer_name.strip() or "ทดสอบ ลูกค้า Facebook"
+    comment = comment_text.strip() or "มาม่าไก่กรอบคลุกซอส ไม่เผ็ด (แยกสาหร่าย) 2 ไก่กรอบคลุกซอสเกาหลี 1 194/119 ซ.6/2 ใช้ไทยพลัสค่ะ"
 
     print("\n" + "=" * 60)
-    print("๐งช เน€เธฃเธดเนเธกเธ—เธ”เธชเธญเธเธชเนเธเธญเธญเน€เธ”เธญเธฃเนเน€เธเนเธฒ Telegram")
-    print(f"๐‘ค เธเธทเนเธญเธฅเธนเธเธเนเธฒ: {name}")
-    print(f"๐’ฌ เธเนเธญเธเธงเธฒเธกเธเธญเธกเน€เธกเธเธ•เน: {comment}")
+    print("🧪 เริ่มทดสอบส่งออเดอร์เข้า Telegram")
+    print(f"👤 ชื่อลูกค้า: {name}")
+    print(f"💬 ข้อความคอมเมนต์: {comment}")
     print("=" * 60)
-    print("[*] เธเธณเธฅเธฑเธเธชเนเธเธเนเธญเธกเธนเธฅเนเธเธขเธฑเธ POS Telegram Draft API...")
+    print("[*] กำลังส่งข้อมูลไปยัง POS Telegram Draft API...")
 
-    res = send_pos_draft_order(customer_name=name, comment_text=comment, reason="เธ—เธ”เธชเธญเธเธฃเธฐเธเธ Telegram Draft", sync=True)
+    res = send_pos_draft_order(customer_name=name, comment_text=comment, reason="ทดสอบระบบ Telegram Draft", sync=True)
     if res and res.get("success"):
         draft_id = res.get("draft_id", "-")
-        print(f"\n[โ“] เธชเธฃเนเธฒเธเธฃเนเธฒเธเธญเธญเน€เธ”เธญเธฃเนเน€เธเนเธฒ Telegram เธชเธณเน€เธฃเนเธ! (Draft ID: {draft_id})")
-        print("๐‘ เธเธฃเธธเธ“เธฒเน€เธเธดเธ”เนเธญเธ Telegram เน€เธเธทเนเธญเธ—เธ”เธชเธญเธเธ•เธญเธเธเธณเธ–เธฒเธกเนเธฅเธฐเธขเธทเธเธขเธฑเธเธญเธญเน€เธ”เธญเธฃเนเนเธ”เนเธ—เธฑเธเธ—เธต")
+        print(f"\n[✓] สร้างร่างออเดอร์เข้า Telegram สำเร็จ! (Draft ID: {draft_id})")
+        print("👉 กรุณาเปิดแอป Telegram เพื่อทดสอบตอบคำถามและยืนยันออเดอร์ได้ทันที")
     else:
-        err = res.get("error") if res else "เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”"
-        print(f"\n[!] เธชเนเธเธญเธญเน€เธ”เธญเธฃเนเธ—เธ”เธชเธญเธเนเธกเนเธชเธณเน€เธฃเนเธ: {err}")
+        err = res.get("error") if res else "เกิดข้อผิดพลาด"
+        print(f"\n[!] ส่งออเดอร์ทดสอบไม่สำเร็จ: {err}")
 
 
 def run_monitor(once: bool = False):
-    """เธฃเธฑเธเธฃเธฐเธเธเน€เธเนเธฒเธ”เธนเธเธญเธกเน€เธกเธเธ•เนเนเธเนเธเธชเธ•เน (เธฃเธญเธเธฃเธฑเธเธซเธฅเธฒเธขเนเธเธชเธ•เน เนเธฅเธฐเธฃเธญเธเธฃเธฑเธเน€เธเธฅเธตเนเธขเธ/เธชเธฅเธฑเธเธฅเธดเธเธเนเธ—เธฑเธเธ—เธตเนเธเธ Realtime)"""
+    """รันระบบเฝ้าดูคอมเมนต์ในโพสต์ (รองรับหลายโพสต์ และรองรับเปลี่ยน/สลับลิงก์ทันทีแบบ Realtime)"""
     active_urls = get_post_urls(reload_env=True)
     if not active_urls:
         active_urls = POST_URLS
 
     if not active_urls:
-        print("\n[!] เธขเธฑเธเนเธกเนเนเธ”เนเธฃเธฐเธเธธ POST_URL เธซเธฃเธทเธญเนเธกเนเธกเธต URL เธ—เธตเนเธ–เธนเธเธ•เนเธญเธ")
-        print("๐‘ เธเธฃเธธเธ“เธฒเน€เธเธดเธ”เนเธเธฅเน .env เธซเธฃเธทเธญเธฃเธฐเธเธธเธฅเธดเธเธเนเนเธเธซเธเนเธฒเธ•เนเธฒเธเนเธเธฃเนเธเธฃเธก (GUI) เนเธฅเนเธงเธเธฑเธเธ—เธถเธ/เธญเธฑเธเน€เธ”เธ•\n")
+        print("\n[!] ยังไม่ได้ระบุ POST_URL หรือไม่มี URL ที่ถูกต้อง")
+        print("👉 กรุณาเปิดไฟล์ .env หรือระบุลิงก์ในหน้าต่างโปรแกรม (GUI) แล้วบันทึก/อัปเดต\n")
         return
 
     print("\n" + "="*60)
-    print("๐€ เน€เธฃเธดเนเธกเธฃเธฐเธเธเน€เธเนเธฒเธ”เธนเธเธญเธกเน€เธกเธเธ•เนเนเธเธชเธ•เน Facebook")
-    print(f"๐“ เธเธณเธเธงเธเนเธเธชเธ•เนเธ—เธตเนเน€เธเนเธฒเธ”เธน: {len(active_urls)} เนเธเธชเธ•เน")
+    print("🚀 เริ่มระบบเฝ้าดูคอมเมนต์โพสต์ Facebook")
+    print(f"📌 จำนวนโพสต์ที่เฝ้าดู: {len(active_urls)} โพสต์")
     for idx, p_url in enumerate(active_urls, 1):
         print(f"   [{idx}] {p_url}")
-    print(f"โฑ๏ธ เธฃเธญเธเธเธฒเธฃเธ•เธฃเธงเธเธชเธญเธ: เธ—เธธเธเน ~{CHECK_INTERVAL} เธงเธดเธเธฒเธ—เธต")
+    print(f"⏱️ รอบการตรวจสอบ: ทุกๆ ~{CHECK_INTERVAL} วินาที")
     if OPERATING_HOURS:
-        print(f"โฐ เน€เธงเธฅเธฒเธ—เธณเธเธฒเธฃเธฃเนเธฒเธ: {OPERATING_HOURS}")
+        print(f"⏰ เวลาทำการร้าน: {OPERATING_HOURS}")
     if SEND_IDLE_STATUS:
-        print("๐“ฑ เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเน€เธเนเธฒ Telegram: เธชเนเธเธ—เธธเธเธฃเธญเธ (เนเธเธเนเธฃเนเน€เธชเธตเธขเธ)")
+        print("📱 อัปเดตสถานะเข้า Telegram: ส่งทุกรอบ (แบบไร้เสียง)")
     if USE_AI and GEMINI_API_KEY:
-        print("๐ค– เนเธซเธกเธ”เธเธฒเธฃเธงเธดเน€เธเธฃเธฒเธฐเธซเน: AI (Google Gemini Flash)")
+        print("🤖 โหมดการวิเคราะห์: AI (Google Gemini Flash)")
     else:
-        print("๐” เนเธซเธกเธ”เธเธฒเธฃเธงเธดเน€เธเธฃเธฒเธฐเธซเน: Rule-based (เธ•เธฃเธงเธเธเธฑเธเธเธณเธงเนเธฒ 'เธฃเธฑเธเธญเธญเน€เธ”เธญเธฃเน' เนเธเน€เธเธฃเธทเนเธญเธ)")
+        print("🔍 โหมดการวิเคราะห์: Rule-based (ตรวจจับคำว่า 'รับออเดอร์' ในเครื่อง)")
+
+    # เริ่มเธรดเฝ้ารับคำสั่งจาก Telegram ในโหมด watch
+    if not once:
+        def _bg_tg_listener():
+            import time
+            from telegram_bridge import check_pending_post_command, execute_telegram_post_task
+            time.sleep(5)
+            while True:
+                try:
+                    task = check_pending_post_command()
+                    if task:
+                        print(f"\n[*] 🤖 ได้รับคำสั่งสร้างโพสต์จาก Telegram ({task.get('command')} ปิด {task.get('close_time', '20.00')} น.)...")
+                        res = execute_telegram_post_task(task)
+                        if res.get("success"):
+                            print("[✓] อัปเดตโพสต์ใหม่เรียบร้อยแล้ว กำลังสลับไปเฝ้าดูโพสต์ใหม่...")
+                except Exception:
+                    pass
+                time.sleep(6)
+        import threading
+        threading.Thread(target=_bg_tg_listener, daemon=True).start()
     auto_reply_on, auto_reply_txt = get_auto_reply_settings(reload_env=True)
     if auto_reply_on:
-        print(f"๐’ฌ เธ•เธญเธเธเธฅเธฑเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธดเธเธ FB: เน€เธเธดเธ”เนเธเนเธเธฒเธ (เธเนเธญเธเธงเธฒเธก: \"{auto_reply_txt}\")")
+        print(f"💬 ตอบกลับอัตโนมัติบน FB: เปิดใช้งาน (ข้อความ: \"{auto_reply_txt}\")")
     else:
-        print("๐’ฌ เธ•เธญเธเธเธฅเธฑเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธดเธเธ FB: เธเธดเธ”เธเธฒเธฃเนเธเนเธเธฒเธ")
+        print("💬 ตอบกลับอัตโนมัติบน FB: ปิดการใช้งาน")
     print("="*60 + "\n")
 
     notified_cache = load_cache()
-    print(f"[*] เนเธซเธฅเธ”เธเธฃเธฐเธงเธฑเธ•เธดเธ—เธตเนเน€เธเธขเนเธเนเธเน€เธ•เธทเธญเธเนเธฅเนเธง: {len(notified_cache)} เธฃเธฒเธขเธเธฒเธฃ")
+    print(f"[*] โหลดประวัติที่เคยแจ้งเตือนแล้ว: {len(notified_cache)} รายการ")
 
     with sync_playwright() as p:
         context = get_browser_context(p, headless=False)
         page = context.new_page()
 
         try:
-            # เธ•เธฃเธงเธเธชเธญเธเน€เธเธทเนเธญเธเธ•เนเธเธงเนเธฒเธ•เธดเธ”เธซเธเนเธฒ Login เธซเธฃเธทเธญเนเธกเนเธ”เนเธงเธขเนเธเธชเธ•เนเนเธฃเธ
+            # ตรวจสอบเบื้องต้นว่าติดหน้า Login หรือไม่ด้วยโพสต์แรก
             first_url = active_urls[0] if active_urls else "https://www.facebook.com"
-            print("[*] เธเธณเธฅเธฑเธเน€เธเธดเธ”เธซเธเนเธฒ Facebook เน€เธเธทเนเธญเธ•เธฃเธงเธเธชเธญเธเธชเธ–เธฒเธเธฐเธเธฒเธฃเธฅเนเธญเธเธญเธดเธ...")
+            print("[*] กำลังเปิดหน้า Facebook เพื่อตรวจสอบสถานะการล็อกอิน...")
             page.goto(first_url, wait_until="domcontentloaded")
             time.sleep(3)
 
             if "login" in page.url or page.locator("input[name='email']").is_visible():
-                print("\n[!] เธฃเธฐเธเธเธเธเธงเนเธฒเธเธฑเธเธเธตเธเธญเธเธเธธเธ“เธขเธฑเธเนเธกเนเนเธ”เนเธฅเนเธญเธเธญเธดเธ Facebook")
-                print("๐‘ เธเธฃเธธเธ“เธฒเธฃเธฑเธเธเธณเธชเธฑเนเธ: python main.py --login เน€เธเธทเนเธญเธฅเนเธญเธเธญเธดเธเธเนเธญเธ 1 เธเธฃเธฑเนเธเธเธฃเธฑเธ\n")
+                print("\n[!] ระบบพบว่าบัญชีของคุณยังไม่ได้ล็อกอิน Facebook")
+                print("👉 กรุณารันคำสั่ง: python main.py --login เพื่อล็อกอินก่อน 1 ครั้งครับ\n")
                 return
 
             round_count = 1
             while True:
                 try:
-                    # เธ•เธฃเธงเธเธชเธญเธเนเธฅเธฐเน€เธเธฅเธตเธขเธฃเน Trigger Flag เธซเธฒเธเธกเธตเธเนเธฒเธเธญเธขเธนเน
+                    # ตรวจสอบและเคลียร์ Trigger Flag หากมีค้างอยู่
                     if TRIGGER_FILE.exists():
                         try:
                             TRIGGER_FILE.unlink(missing_ok=True)
                         except Exception:
                             pass
 
-                    # เนเธซเธฅเธ”เธฃเธฒเธขเธเธฒเธฃ URL เธฅเนเธฒเธชเธธเธ”เธเธฒเธ .env เธ—เธธเธเธฃเธญเธ
+                    # โหลดรายการ URL ล่าสุดจาก .env ทุกรอบ
                     latest_urls = get_post_urls(reload_env=True)
                     if latest_urls:
                         if latest_urls != active_urls:
                             print("\n" + "="*60)
-                            print("๐” [เธ•เธฃเธงเธเธเธเธฅเธณเธ”เธฑเธเธฅเธดเธเธเนเนเธเธชเธ•เนเนเธซเธกเนเธเธฒเธ GUI / .env!]")
-                            print(f"๐“ เธญเธฑเธเน€เธ”เธ•เธเธณเธเธงเธเนเธเธชเธ•เนเนเธซเธกเน: {len(latest_urls)} เนเธเธชเธ•เน")
+                            print("🔄 [ตรวจพบลำดับลิงก์โพสต์ใหม่จาก GUI / .env!]")
+                            print(f"📌 อัปเดตจำนวนโพสต์ใหม่: {len(latest_urls)} โพสต์")
                             for idx, p_url in enumerate(latest_urls, 1):
                                 print(f"   [{idx}] {p_url}")
                             print("="*60)
                             active_urls = latest_urls
                     elif not active_urls:
-                        print("\n[!] เธขเธฑเธเนเธกเนเธกเธต URL เนเธเธชเธ•เนเธ—เธตเนเธ–เธนเธเธ•เนเธญเธ เธเธณเธฅเธฑเธเธฃเธญ URL เธเธฒเธเธซเธเนเธฒเธ•เนเธฒเธเนเธเธฃเนเธเธฃเธก...")
+                        print("\n[!] ยังไม่มี URL โพสต์ที่ถูกต้อง กำลังรอ URL จากหน้าต่างโปรแกรม...")
                         time.sleep(3)
                         continue
 
-                    # 1. เธ•เธฃเธงเธเธชเธญเธเน€เธงเธฅเธฒเน€เธเธดเธ”-เธเธดเธ”เธฃเนเธฒเธ
+                    # 1. ตรวจสอบเวลาเปิด-ปิดร้าน
                     if not is_within_operating_hours():
                         now_str = datetime.now().strftime("%H:%M:%S")
-                        print(f"๐ [{now_str}] เธเธ“เธฐเธเธตเนเธญเธขเธนเนเธเธญเธเน€เธงเธฅเธฒเน€เธเธดเธ”เธฃเนเธฒเธ ({OPERATING_HOURS}) เธเธฑเธเธเธฒเธฃเธ•เธฃเธงเธเธเธฑเนเธงเธเธฃเธฒเธง...")
+                        print(f"🌙 [{now_str}] ขณะนี้อยู่นอกเวลาเปิดร้าน ({OPERATING_HOURS}) พักการตรวจชั่วคราว...")
                         for _ in range(120):
                             if TRIGGER_FILE.exists():
                                 break
@@ -160,43 +180,43 @@ def run_monitor(once: bool = False):
                         continue
 
                     now_str = datetime.now().strftime("%H:%M:%S")
-                    print(f"\n๐” [เธฃเธญเธเธ—เธตเน {round_count} - {now_str}] เน€เธฃเธดเนเธกเธ•เธฃเธงเธเน€เธเนเธเธ—เธฑเนเธเธซเธกเธ” {len(active_urls)} เนเธเธชเธ•เน...")
+                    print(f"\n🔄 [รอบที่ {round_count} - {now_str}] เริ่มตรวจเช็คทั้งหมด {len(active_urls)} โพสต์...")
 
                     total_new_alerts = 0
                     interrupted_during_posts = False
 
                     for p_idx, post_url in enumerate(active_urls, 1):
-                        # เธ•เธฃเธงเธเธชเธญเธเธฃเธฐเธซเธงเนเธฒเธเนเธเธชเธ•เนเธงเนเธฒเธกเธตเธเธณเธชเธฑเนเธเธชเธฅเธฑเธเธฅเธดเธเธเนเธ”เนเธงเธเธซเธฃเธทเธญเนเธกเน
+                        # ตรวจสอบระหว่างโพสต์ว่ามีคำสั่งสลับลิงก์ด่วนหรือไม่
                         if TRIGGER_FILE.exists():
-                            print("\nโก [เธ•เธฃเธงเธเธเธเธชเธฑเธเธเธฒเธ“เธเธญเธชเธฅเธฑเธเธฅเธดเธเธเนเธ—เธฑเธเธ—เธต] เธเธณเธฅเธฑเธเน€เธเธฅเธตเนเธขเธเนเธเธขเธฑเธเนเธเธชเธ•เนเธเธธเธ”เนเธซเธกเน...")
+                            print("\n⚡ [ตรวจพบสัญญาณขอสลับลิงก์ทันที] กำลังเปลี่ยนไปยังโพสต์ชุดใหม่...")
                             interrupted_during_posts = True
                             break
 
-                        prefix = f"[เนเธเธชเธ•เนเธ—เธตเน {p_idx}/{len(active_urls)}]" if len(active_urls) > 1 else ""
-                        print(f"\n   ๐“ {prefix} เธเธณเธฅเธฑเธเธ•เธฃเธงเธเนเธเธชเธ•เน: {post_url}")
+                        prefix = f"[โพสต์ที่ {p_idx}/{len(active_urls)}]" if len(active_urls) > 1 else ""
+                        print(f"\n   📄 {prefix} กำลังตรวจโพสต์: {post_url}")
 
                         try:
                             page.goto(post_url, timeout=45000, wait_until="domcontentloaded")
                         except Exception as err:
-                            print(f"      [!] เน€เธเธดเธ”เธซเธเนเธฒเนเธเธชเธ•เนเนเธกเนเธชเธณเน€เธฃเนเธ ({err}) เธเนเธฒเธกเนเธเธขเธฑเธเนเธเธชเธ•เนเธ–เธฑเธ”เนเธ...")
+                            print(f"      [!] เปิดหน้าโพสต์ไม่สำเร็จ ({err}) ข้ามไปยังโพสต์ถัดไป...")
                             continue
 
-                        # 2. เธ”เธถเธเธเธญเธกเน€เธกเธเธ•เน
+                        # 2. ดึงคอมเมนต์
                         post_author, comments = extract_comments_from_page(page, post_url=post_url)
-                        print(f"      ๐“ เธ•เธฃเธงเธเธเธ {len(comments)} เน€เธเธฃเธ”เธเธญเธกเน€เธกเธเธ•เน (เน€เธเนเธฒเธเธญเธเนเธเธชเธ•เน: {post_author or 'เธ•เธฃเธงเธเธเธฑเธเธญเธฑเธ•เนเธเธกเธฑเธ•เธด'})")
+                        print(f"      📊 ตรวจพบ {len(comments)} เธรดคอมเมนต์ (เจ้าของโพสต์: {post_author or 'ตรวจจับอัตโนมัติ'})")
                         for c in comments:
                             snippet = c.get('text', '').replace('\n', ' ')[:45]
                             r_count = len(c.get('replies', []))
-                            print(f"         ๐’ฌ [{c.get('author', 'เธฅเธนเธเธเนเธฒ')}] \"{snippet}\" (เธเธณเธ•เธญเธเธเธฅเธฑเธ: {r_count})")
+                            print(f"         💬 [{c.get('author', 'ลูกค้า')}] \"{snippet}\" (คำตอบกลับ: {r_count})")
 
                         if comments:
-                            # 3. เธงเธดเน€เธเธฃเธฒเธฐเธซเนเธซเธฒเธญเธญเน€เธ”เธญเธฃเนเธ—เธตเนเธขเธฑเธเนเธกเนเนเธ”เนเธฃเธฑเธ
+                            # 3. วิเคราะห์หาออเดอร์ที่ยังไม่ได้รับ
                             unreplied_orders = analyze_comments(comments, post_author=post_author)
                             for item in unreplied_orders:
                                 c_id = item.get("id")
                                 if c_id not in notified_cache:
                                     notify_unreplied_order(
-                                        customer_name=item.get("customer_name", "เธฅเธนเธเธเนเธฒ"),
+                                        customer_name=item.get("customer_name", "ลูกค้า"),
                                         comment_text=item.get("text", ""),
                                         reason=item.get("reason", ""),
                                         post_url=post_url
@@ -204,10 +224,10 @@ def run_monitor(once: bool = False):
                                     notified_cache.add(c_id)
                                     total_new_alerts += 1
 
-                                    # เธ•เธญเธเธฃเธฑเธเธญเธญเน€เธ”เธญเธฃเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธดเธเธ Facebook (เธ–เนเธฒเน€เธเธดเธ”เนเธเนเธเธฒเธ)
+                                    # ตอบรับออเดอร์อัตโนมัติบน Facebook (ถ้าเปิดใช้งาน)
                                     auto_reply_enabled, auto_reply_template = get_auto_reply_settings(reload_env=True)
                                     if auto_reply_enabled:
-                                        print(f"      ๐’ฌ เธเธณเธฅเธฑเธเธ•เธญเธเธเธฅเธฑเธเธเธญเธกเน€เธกเธเธ•เนเธฅเธนเธเธเนเธฒ \"{item.get('customer_name')}\" เธเธ Facebook...")
+                                        print(f"      💬 กำลังตอบกลับคอมเมนต์ลูกค้า \"{item.get('customer_name')}\" บน Facebook...")
                                         replied = reply_to_facebook_comment(
                                             page=page,
                                             customer_name=item.get("customer_name", ""),
@@ -215,9 +235,9 @@ def run_monitor(once: bool = False):
                                             reply_message=auto_reply_template
                                         )
                                         if replied:
-                                            print(f"      [โ“] เธ•เธญเธเธเธฅเธฑเธเธเธญเธกเน€เธกเธเธ•เนเธฅเธนเธเธเนเธฒ \"{item.get('customer_name')}\" เธเธ Facebook เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง!")
+                                            print(f"      [✓] ตอบกลับคอมเมนต์ลูกค้า \"{item.get('customer_name')}\" บน Facebook เรียบร้อยแล้ว!")
                                         else:
-                                            print(f"      [!] เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธ•เธญเธเธเธฅเธฑเธเธเธญเธกเน€เธกเธเธ•เนเธฅเธนเธเธเนเธฒ \"{item.get('customer_name')}\" เธญเธฑเธ•เนเธเธกเธฑเธ•เธดเนเธ”เน")
+                                            print(f"      [!] ไม่สามารถตอบกลับคอมเมนต์ลูกค้า \"{item.get('customer_name')}\" อัตโนมัติได้")
                                         time.sleep(1.5)
 
                         if p_idx < len(active_urls):
@@ -228,25 +248,25 @@ def run_monitor(once: bool = False):
 
                     if total_new_alerts > 0:
                         save_cache(notified_cache)
-                        print(f"\n   ๐จ เนเธเนเธเน€เธ•เธทเธญเธเธญเธญเน€เธ”เธญเธฃเนเธเนเธฒเธเธ•เธญเธเนเธซเธกเนเนเธเธฃเธญเธเธเธตเน: {total_new_alerts} เธฃเธฒเธขเธเธฒเธฃ")
+                        print(f"\n   🚨 แจ้งเตือนออเดอร์ค้างตอบใหม่ในรอบนี้: {total_new_alerts} รายการ")
                     else:
-                        print(f"\n   โ… เธ•เธฃเธงเธเธชเธญเธเธเธฃเธเธ—เธธเธเนเธเธชเธ•เนเนเธฅเนเธง: เธญเธญเน€เธ”เธญเธฃเนเธ—เธฑเนเธเธซเธกเธ”เนเธ”เนเธฃเธฑเธเธเธฒเธฃเธ•เธญเธเธฃเธฑเธเนเธฅเนเธง เธซเธฃเธทเธญเนเธกเนเธกเธตเธญเธญเน€เธ”เธญเธฃเนเนเธซเธกเน")
+                        print(f"\n   ✅ ตรวจสอบครบทุกโพสต์แล้ว: ออเดอร์ทั้งหมดได้รับการตอบรับแล้ว หรือไม่มีออเดอร์ใหม่")
                         if SEND_IDLE_STATUS:
                             short_time = datetime.now().strftime("%H:%M")
-                            post_count_str = f" ({len(active_urls)} เนเธเธชเธ•เน)" if len(active_urls) > 1 else ""
-                            send_telegram_status(f"โ… เธ•เธฃเธงเธเธชเธญเธเนเธฅเนเธง ({short_time}): เนเธกเนเธกเธตเธญเธญเน€เธ”เธญเธฃเนเนเธซเธกเน{post_count_str}")
+                            post_count_str = f" ({len(active_urls)} โพสต์)" if len(active_urls) > 1 else ""
+                            send_telegram_status(f"✅ ตรวจสอบแล้ว ({short_time}): ไม่มีออเดอร์ใหม่{post_count_str}")
 
                     if once:
-                        print("\n[โ“] เธ•เธฃเธงเธเธชเธญเธเธฃเธญเธเน€เธ”เธตเธขเธงเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง เธเธดเธ”เธเธฒเธฃเธ—เธณเธเธฒเธ")
+                        print("\n[✓] ตรวจสอบรอบเดียวเรียบร้อยแล้ว ปิดการทำงาน")
                         break
 
-                    # เธชเธธเนเธกเธซเธเนเธงเธเน€เธงเธฅเธฒเน€เธฅเนเธเธเนเธญเธขเน€เธเธทเนเธญเธเธงเธฒเธกเธเธฅเธญเธ”เธ เธฑเธข เธเนเธญเธเธเธฑเธ Bot Detection
+                    # สุ่มหน่วงเวลาเล็กน้อยเพื่อความปลอดภัย ป้องกัน Bot Detection
                     current_interval = get_check_interval(reload_env=True)
                     jitter = random.randint(-5, 10)
                     sleep_time = max(30, current_interval + jitter)
-                    print(f"\n   โณ เธฃเธญเธญเธตเธ {sleep_time} เธงเธดเธเธฒเธ—เธตเธเนเธญเธเธ•เธฃเธงเธเน€เธเนเธเธฃเธญเธเธ–เธฑเธ”เนเธ... (เนเธเนเนเธเธฅเธดเธเธเนเนเธ GUI เนเธฅเนเธงเธเธ”เธญเธฑเธเน€เธ”เธ•เน€เธเธทเนเธญเธ•เธฃเธงเธเธ—เธฑเธเธ—เธตเนเธ”เนเธ•เธฅเธญเธ”เน€เธงเธฅเธฒ)")
+                    print(f"\n   ⏳ รออีก {sleep_time} วินาทีก่อนตรวจเช็ครอบถัดไป... (แก้ไขลิงก์ใน GUI แล้วกดอัปเดตเพื่อตรวจทันทีได้ตลอดเวลา)")
 
-                    # เธเธฑเธเธ–เธญเธขเธซเธฅเธฑเธเน€เธเนเธเธงเธดเธเธฒเธ—เธต เธเธฃเนเธญเธกเธ”เธฑเธเธเธฑเธ Trigger File เธซเธฃเธทเธญ URL Change
+                    # นับถอยหลังเป็นวินาที พร้อมดักจับ Trigger File หรือ URL Change
                     sleep_start = time.time()
                     last_printed_sec = -1
                     while (time.time() - sleep_start) < sleep_time:
@@ -255,21 +275,21 @@ def run_monitor(once: bool = False):
                                 TRIGGER_FILE.unlink(missing_ok=True)
                             except Exception:
                                 pass
-                            print("\nโก [เธ•เธฃเธงเธเธเธเธชเธฑเธเธเธฒเธ“เธญเธฑเธเน€เธ”เธ•เธเธฒเธ GUI] เธเนเธฒเธกเน€เธงเธฅเธฒเธฃเธญเนเธฅเธฐเน€เธฃเธดเนเธกเธ•เธฃเธงเธเนเธเธชเธ•เนเนเธซเธกเนเธ—เธฑเธเธ—เธต!")
+                            print("\n⚡ [ตรวจพบสัญญาณอัปเดตจาก GUI] ข้ามเวลารอและเริ่มตรวจโพสต์ใหม่ทันที!")
                             break
 
                         elapsed = int(time.time() - sleep_start)
-                        # เน€เธเนเธ .env เธ—เธธเธเน 3 เธงเธดเธเธฒเธ—เธต เน€เธเธทเนเธญเธเธนเนเนเธเนเธเธฑเธเธ—เธถเธเนเธเธฅเน .env เนเธ”เธขเธ•เธฃเธ
+                        # เช็ค .env ทุกๆ 3 วินาที เผื่อผู้ใช้บันทึกไฟล์ .env โดยตรง
                         if elapsed > 0 and elapsed % 3 == 0 and elapsed != last_printed_sec:
                             chk_urls = get_post_urls(reload_env=True)
                             if chk_urls and chk_urls != active_urls:
-                                print("\nโก [เธ•เธฃเธงเธเธเธเธเธฒเธฃเน€เธเธฅเธตเนเธขเธ URL เนเธ .env] เธเนเธฒเธกเน€เธงเธฅเธฒเธฃเธญเนเธฅเธฐเน€เธฃเธดเนเธกเธ•เธฃเธงเธเนเธเธชเธ•เนเนเธซเธกเนเธ—เธฑเธเธ—เธต!")
+                                print("\n⚡ [ตรวจพบการเปลี่ยน URL ใน .env] ข้ามเวลารอและเริ่มตรวจโพสต์ใหม่ทันที!")
                                 break
 
                         remaining = int(sleep_time - elapsed)
                         if remaining > 0 and remaining % 30 == 0 and remaining != last_printed_sec:
                             last_printed_sec = remaining
-                            print(f"      ...เธเธฐเธ•เธฃเธงเธเธฃเธญเธเธ–เธฑเธ”เนเธเนเธเธญเธตเธ {remaining} เธงเธดเธเธฒเธ—เธต... (เธซเธฃเธทเธญเธเธ”เธญเธฑเธเน€เธ”เธ•เนเธ GUI เน€เธเธทเนเธญเน€เธฃเธดเนเธกเธ—เธฑเธเธ—เธต)")
+                            print(f"      ...จะตรวจรอบถัดไปในอีก {remaining} วินาที... (หรือกดอัปเดตใน GUI เพื่อเริ่มทันที)")
 
                         time.sleep(1)
 
@@ -278,42 +298,42 @@ def run_monitor(once: bool = False):
                 except KeyboardInterrupt:
                     raise
                 except Exception as err:
-                    print(f"\n[!] เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเธ•เธฃเธงเธเธชเธญเธเธฃเธญเธเธเธตเน: {err}")
-                    print("   โณ เธฃเธญ 20 เธงเธดเธเธฒเธ—เธตเธเนเธญเธเธฅเธญเธเธฃเธญเธเธ–เธฑเธ”เนเธ...")
+                    print(f"\n[!] เกิดข้อผิดพลาดในการตรวจสอบรอบนี้: {err}")
+                    print("   ⏳ รอ 20 วินาทีก่อนลองรอบถัดไป...")
                     for _ in range(20):
                         if TRIGGER_FILE.exists():
                             break
                         time.sleep(1)
 
         except KeyboardInterrupt:
-            print("\n[!] เธเธนเนเนเธเนเธชเธฑเนเธเธซเธขเธธเธ”เธเธฒเธฃเธ—เธณเธเธฒเธ (Ctrl+C)")
+            print("\n[!] ผู้ใช้สั่งหยุดการทำงาน (Ctrl+C)")
         finally:
             try:
                 context.close()
             except Exception:
                 pass
-            print("[*] เธเธดเธ”เน€เธเธฃเธฒเธงเนเน€เธเธญเธฃเนเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง")
+            print("[*] ปิดเบราว์เซอร์เรียบร้อยแล้ว")
 
 def clear_cache():
-    """เธฅเนเธฒเธเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธเน€เธเธทเนเธญเน€เธฃเธดเนเธกเธ•เธฃเธงเธเธเธฑเธเนเธซเธกเนเธ—เธฑเนเธเธซเธกเธ”"""
+    """ล้างประวัติการแจ้งเตือนเพื่อเริ่มตรวจนับใหม่ทั้งหมด"""
     from config import CACHE_FILE
     if CACHE_FILE.exists():
         CACHE_FILE.unlink()
-    print("[โ“] เธฅเนเธฒเธเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธ (notified_cache.json) เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง")
+    print("[✓] ล้างประวัติการแจ้งเตือน (notified_cache.json) เรียบร้อยแล้ว")
 
 def setup_telegram():
-    """เธเนเธเธซเธฒ Chat ID เธเธญเธเธเธนเนเนเธเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธดเนเธฅเธฐเธเธฑเธเธ—เธถเธเธฅเธ .env"""
+    """ค้นหา Chat ID ของผู้ใช้อัตโนมัติและบันทึกลง .env"""
     import re
     import requests
     from config import TELEGRAM_BOT_TOKEN, BASE_DIR
 
     if not TELEGRAM_BOT_TOKEN:
-        print("[!] เธขเธฑเธเนเธกเนเนเธ”เนเธฃเธฐเธเธธ TELEGRAM_BOT_TOKEN เนเธเนเธเธฅเน .env")
+        print("[!] ยังไม่ได้ระบุ TELEGRAM_BOT_TOKEN ในไฟล์ .env")
         return
 
     print("\n" + "="*60)
-    print("๐ค– เธเธณเธฅเธฑเธเน€เธเธทเนเธญเธกเธ•เนเธญเธเธฑเธ Telegram Bot (@takoab_alert_bot)...")
-    print("๐‘ เธซเธฒเธเธขเธฑเธเนเธกเนเนเธ”เนเธเธ” เนเธซเนเน€เธเธดเธ”เนเธญเธ Telegram เธเนเธเธซเธฒ @takoab_alert_bot เนเธฅเนเธงเธเธ” [Start]")
+    print("🤖 กำลังเชื่อมต่อกับ Telegram Bot (@takoab_alert_bot)...")
+    print("👉 หากยังไม่ได้กด ให้เปิดแอป Telegram ค้นหา @takoab_alert_bot แล้วกด [Start]")
     print("="*60)
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
@@ -329,7 +349,7 @@ def setup_telegram():
                 user_name = chat.get("first_name", "") or chat.get("username", "")
 
                 if chat_id:
-                    print(f"\n[โ“] เธ•เธฃเธงเธเธเธ Chat ID เธเธญเธเธเธธเธ“เนเธฅเนเธง! (เธเธนเนเนเธเน: {user_name} | ID: {chat_id})")
+                    print(f"\n[✓] ตรวจพบ Chat ID ของคุณแล้ว! (ผู้ใช้: {user_name} | ID: {chat_id})")
                     
                     env_path = BASE_DIR / ".env"
                     if env_path.exists():
@@ -339,35 +359,35 @@ def setup_telegram():
                         else:
                             content += f"\nTELEGRAM_CHAT_ID={chat_id}\n"
                         env_path.write_text(content, encoding="utf-8")
-                        print("[โ“] เธเธฑเธเธ—เธถเธ TELEGRAM_CHAT_ID เธฅเธเนเธเนเธเธฅเน .env เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง!")
+                        print("[✓] บันทึก TELEGRAM_CHAT_ID ลงในไฟล์ .env เรียบร้อยแล้ว!")
 
                     test_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
                     requests.post(test_url, json={
                         "chat_id": chat_id,
-                        "text": "๐ <b>เน€เธเธทเนเธญเธกเธ•เนเธญเธฃเธฐเธเธเนเธเนเธเน€เธ•เธทเธญเธเธชเธณเน€เธฃเนเธ!</b>\n\nเน€เธกเธทเนเธญเธกเธตเธฅเธนเธเธเนเธฒเธชเธฑเนเธเธญเธญเน€เธ”เธญเธฃเนเนเธซเธกเนเนเธเธเธฅเธธเนเธก Facebook เธฃเธฐเธเธเธเธฐเธชเนเธเธเนเธญเธเธงเธฒเธกเนเธเนเธเน€เธ•เธทเธญเธเน€เธเนเธฒ Telegram เธเธตเนเธ—เธฑเธเธ—เธตเธเธฃเธฑเธ",
+                        "text": "🎉 <b>เชื่อมต่อระบบแจ้งเตือนสำเร็จ!</b>\n\nเมื่อมีลูกค้าสั่งออเดอร์ใหม่ในกลุ่ม Facebook ระบบจะส่งข้อความแจ้งเตือนเข้า Telegram นี้ทันทีครับ",
                         "parse_mode": "HTML"
                     }, timeout=10)
-                    print("[โ“] เธชเนเธเธเนเธญเธเธงเธฒเธกเธ—เธ”เธชเธญเธเน€เธเนเธฒ Telegram เธเธเธกเธทเธญเธ–เธทเธญเธเธญเธเธเธธเธ“เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง!")
+                    print("[✓] ส่งข้อความทดสอบเข้า Telegram บนมือถือของคุณเรียบร้อยแล้ว!")
                     return
         except Exception:
             pass
         
-        print(f"[*] เธเธณเธฅเธฑเธเธฃเธญเธเนเธญเธเธงเธฒเธกเธเธฒเธเธเธธเธ“เนเธ Telegram... ({attempt}/10) [เธเธฃเธธเธ“เธฒเธเธ” Start เธ—เธตเน @takoab_alert_bot]")
+        print(f"[*] กำลังรอข้อความจากคุณใน Telegram... ({attempt}/10) [กรุณากด Start ที่ @takoab_alert_bot]")
         time.sleep(3)
 
-    print("\n[!] เธขเธฑเธเนเธกเนเธเธเธเนเธญเธเธงเธฒเธกเน€เธเนเธฒ เธเธฃเธธเธ“เธฒเน€เธเธดเธ” Telegram เน€เธเนเธฒเนเธเธ—เธตเน @takoab_alert_bot เนเธฅเนเธงเธเธ” Start เธเธฒเธเธเธฑเนเธเธฃเธฑเธเธเธณเธชเธฑเนเธเธเธตเนเนเธซเธกเนเธญเธตเธเธเธฃเธฑเนเธเธเธฃเธฑเธ")
+    print("\n[!] ยังไม่พบข้อความเข้า กรุณาเปิด Telegram เข้าไปที่ @takoab_alert_bot แล้วกด Start จากนั้นรันคำสั่งนี้ใหม่อีกครั้งครับ")
 
 def main():
     parser = argparse.ArgumentParser(description="Facebook Group Post Order Monitor")
-    parser.add_argument("--login", action="store_true", help="เน€เธเธดเธ”เน€เธเธฃเธฒเธงเนเน€เธเธญเธฃเนเน€เธเธทเนเธญเธฅเนเธญเธเธญเธดเธ Facebook เธเธฃเธฑเนเธเนเธฃเธ")
-    parser.add_argument("--watch", action="store_true", help="เน€เธฃเธดเนเธกเน€เธเนเธฒเธ”เธนเนเธเธชเธ•เนเนเธฅเธฐเนเธเนเธเน€เธ•เธทเธญเธเธญเธญเน€เธ”เธญเธฃเน")
-    parser.add_argument("--check-once", action="store_true", help="เธ•เธฃเธงเธเน€เธเนเธเน€เธเธตเธขเธ 1 เธฃเธญเธเนเธฅเนเธงเนเธชเธ”เธเธเธฅเธฅเธฑเธเธเน")
-    parser.add_argument("--test-notify", action="store_true", help="เธ—เธ”เธชเธญเธเธฃเธฐเธเธเน€เธชเธตเธขเธเนเธฅเธฐเธเธฒเธฃเนเธเนเธเน€เธ•เธทเธญเธเธเธ Mac")
-    parser.add_argument("--clear-cache", action="store_true", help="เธฅเนเธฒเธเธเธฃเธฐเธงเธฑเธ•เธดเธเธญเธกเน€เธกเธเธ•เนเธ—เธตเนเน€เธเธขเนเธเนเธเน€เธ•เธทเธญเธเนเธฅเนเธง")
-    parser.add_argument("--telegram-setup", action="store_true", help="เน€เธเธทเนเธญเธกเธ•เนเธญเนเธฅเธฐเธเนเธเธซเธฒ Telegram Chat ID เธญเธฑเธ•เนเธเธกเธฑเธ•เธด")
-    parser.add_argument("--test-order", action="store_true", help="เธชเนเธเธ—เธ”เธชเธญเธเธญเธญเน€เธ”เธญเธฃเนเน€เธเนเธฒ Telegram เนเธ”เธขเธฃเธฐเธเธธเธเธทเนเธญเนเธฅเธฐเธเธญเธกเน€เธกเธเธ•เน")
-    parser.add_argument("--name", type=str, default="", help="เธเธทเนเธญเธฅเธนเธเธเนเธฒเธชเธณเธซเธฃเธฑเธเธเธฒเธฃเธ—เธ”เธชเธญเธ (เนเธเนเธฃเนเธงเธกเธเธฑเธ --test-order)")
-    parser.add_argument("--comment", type=str, default="", help="เธเนเธญเธเธงเธฒเธกเธเธญเธกเน€เธกเธเธ•เนเธชเธณเธซเธฃเธฑเธเธเธฒเธฃเธ—เธ”เธชเธญเธ (เนเธเนเธฃเนเธงเธกเธเธฑเธ --test-order)")
+    parser.add_argument("--login", action="store_true", help="เปิดเบราว์เซอร์เพื่อล็อกอิน Facebook ครั้งแรก")
+    parser.add_argument("--watch", action="store_true", help="เริ่มเฝ้าดูโพสต์และแจ้งเตือนออเดอร์")
+    parser.add_argument("--check-once", action="store_true", help="ตรวจเช็คเพียง 1 รอบแล้วแสดงผลลัพธ์")
+    parser.add_argument("--test-notify", action="store_true", help="ทดสอบระบบเสียงและการแจ้งเตือนบน Mac")
+    parser.add_argument("--clear-cache", action="store_true", help="ล้างประวัติคอมเมนต์ที่เคยแจ้งเตือนแล้ว")
+    parser.add_argument("--telegram-setup", action="store_true", help="เชื่อมต่อและค้นหา Telegram Chat ID อัตโนมัติ")
+    parser.add_argument("--test-order", action="store_true", help="ส่งทดสอบออเดอร์เข้า Telegram โดยระบุชื่อและคอมเมนต์")
+    parser.add_argument("--name", type=str, default="", help="ชื่อลูกค้าสำหรับการทดสอบ (ใช้ร่วมกับ --test-order)")
+    parser.add_argument("--comment", type=str, default="", help="ข้อความคอมเมนต์สำหรับการทดสอบ (ใช้ร่วมกับ --test-order)")
     parser.add_argument("--post", "--create-post", dest="create_post", action="store_true", help="สร้างและเผยแพร่โพสต์เปิดร้านลงกลุ่ม Facebook อัตโนมัติ")
     parser.add_argument("--post-date", type=str, default="", help="ระบุวันที่สำหรับโพสต์ (เช่น 'อาทิตย์ 1/11/69') หากไม่ระบุจะใช้วันนี้")
     parser.add_argument("--close-time", type=str, default="20.00", help="ระบุเวลารับออเดอร์ถึง (เช่น '20.00' หรือ '20.30') ค่าเริ่มต้นคือ 20.00")
@@ -417,11 +437,11 @@ def main():
 
         print("\n" + "=" * 60)
         if args.post_preview:
-            print("๐‘ เธชเธฃเนเธฒเธเธ เธฒเธเธ•เธฑเธงเธญเธขเนเธฒเธเนเธเธชเธ•เน Facebook...")
+            print("👁 สร้างภาพตัวอย่างโพสต์ Facebook...")
         else:
-            print("๐“ข เธเธณเธฅเธฑเธเธชเธฃเนเธฒเธเนเธฅเธฐเน€เธเธขเนเธเธฃเนเนเธเธชเธ•เนเธฅเธเธเธฅเธธเนเธก Facebook...")
-        print(f"๐“ เธเธฅเธธเนเธกเน€เธเนเธฒเธซเธกเธฒเธข: {group_target}")
-        print(f"๐–ผ เธเธณเธเธงเธเธฃเธนเธเธ เธฒเธเนเธเธ: {len(images)} เธฃเธนเธ")
+            print("📢 กำลังสร้างและเผยแพร่โพสต์ลงกลุ่ม Facebook...")
+        print(f"📌 กลุ่มเป้าหมาย: {group_target}")
+        print(f"🖼 จำนวนรูปภาพแนบ: {len(images)} รูป")
         print("=" * 60 + "\n")
 
         res = publish_facebook_group_post(
@@ -433,33 +453,33 @@ def main():
         )
         if res.get("success"):
             if args.post_preview:
-                print(f"\n[โ“] เธชเธฃเนเธฒเธเธ เธฒเธเธ•เธฑเธงเธญเธขเนเธฒเธเธชเธณเน€เธฃเนเธ: {res.get('preview_image')}")
+                print(f"\n[✓] สร้างภาพตัวอย่างสำเร็จ: {res.get('preview_image')}")
             else:
                 post_url = res.get("post_url")
-                print(f"\n[โ“] เน€เธเธขเนเธเธฃเนเนเธเธชเธ•เนเธชเธณเน€เธฃเนเธ! เธฅเธดเธเธเนเนเธเธชเธ•เน: {post_url}")
+                print(f"\n[✓] เผยแพร่โพสต์สำเร็จ! ลิงก์โพสต์: {post_url}")
                 if post_url and "posts" in post_url:
                     update_env_post_url(post_url)
-                    print("๐‘ เธญเธฑเธเน€เธ”เธ• POST_URL เนเธ .env เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง")
+                    print("👉 อัปเดต POST_URL ใน .env เรียบร้อยแล้ว")
                 if args.auto_watch:
-                    print("\n๐€ เน€เธฃเธดเนเธกเน€เธเนเธฒเธชเธนเนเนเธซเธกเธ”เน€เธเนเธฒเธ”เธนเธเธญเธกเน€เธกเธเธ•เนเธ—เธฑเธเธ—เธต...")
+                    print("\n🚀 เริ่มเข้าสู่โหมดเฝ้าดูคอมเมนต์ทันที...")
                     run_monitor(once=False)
         else:
-            print(f"\n[!] เธเธฒเธฃเนเธเธชเธ•เนเนเธกเนเธชเธณเน€เธฃเนเธ: {res.get('error')}")
+            print(f"\n[!] การโพสต์ไม่สำเร็จ: {res.get('error')}")
     elif args.check_once:
         run_monitor(once=True)
     elif args.watch:
         run_monitor(once=False)
     else:
         parser.print_help()
-        print("\nเธ•เธฑเธงเธญเธขเนเธฒเธเธเธณเธชเธฑเนเธเนเธเนเธเธฒเธ:")
-        print("  1. python main.py --login           # เธฅเนเธญเธเธญเธดเธ Facebook เธเธฃเธฑเนเธเนเธฃเธ")
-        print("  2. python main.py --telegram-setup  # เน€เธเธทเนเธญเธกเธ•เนเธญ Telegram Chat ID เธญเธฑเธ•เนเธเธกเธฑเธ•เธด")
-        print("  3. python main.py --watch           # เน€เธฃเธดเนเธกเน€เธเนเธฒเธ”เธนเนเธเธชเธ•เนเนเธฅเธฐเนเธเนเธเน€เธ•เธทเธญเธ")
-        print("  4. python main.py --post            # เธชเธฃเนเธฒเธเนเธฅเธฐเนเธเธชเธ•เนเน€เธเธดเธ”เธฃเนเธฒเธเธฅเธเธเธฅเธธเนเธก Facebook")
-        print("  5. python main.py --post-preview    # เธ”เธนเธ เธฒเธเธ•เธฑเธงเธญเธขเนเธฒเธเนเธเธชเธ•เนเธเนเธญเธเธชเนเธเธเธฃเธดเธ")
-        print("  6. python main.py --test-order      # เธ—เธ”เธชเธญเธเธชเนเธเธญเธญเน€เธ”เธญเธฃเนเน€เธเนเธฒ Telegram")
-        print("  7. python main.py --test-order --name \"เธเธธเธ“เธชเธกเธเธฒเธข\" --comment \"เธ—เธฒเนเธเธฐเธขเธฒเธเธด 1 เธเธฅเนเธญเธ\"")
+        print("\nตัวอย่างคำสั่งใช้งาน:")
+        print("  1. python main.py --login           # ล็อกอิน Facebook ครั้งแรก")
+        print("  2. python main.py --telegram-setup  # เชื่อมต่อ Telegram Chat ID อัตโนมัติ")
+        print("  3. python main.py --watch           # เริ่มเฝ้าดูโพสต์และแจ้งเตือน")
+        print("  4. python main.py --post            # สร้างและโพสต์เปิดร้านลงกลุ่ม Facebook")
+        print("  5. python main.py --post-preview    # ดูภาพตัวอย่างโพสต์ก่อนส่งจริง")
+        print("  6. python main.py --listen-telegram # เฝ้ารอรับคำสั่ง /post จาก Telegram")
+        print("  7. python main.py --test-order      # ทดสอบส่งออเดอร์เข้า Telegram")
+        print("  8. python main.py --test-order --name \"คุณสมชาย\" --comment \"ทาโกะยากิ 1 กล่อง\"")
 
 if __name__ == "__main__":
     main()
-
